@@ -6,6 +6,7 @@ import '../engine/duel_session.dart';
 import '../engine/element.dart';
 import '../engine/game_card.dart';
 import '../state/providers.dart';
+import 'art.dart';
 import 'duel_setup.dart';
 import 'reward_screen.dart';
 import 'theme.dart';
@@ -19,11 +20,41 @@ class DuelScreen extends ConsumerStatefulWidget {
   ConsumerState<DuelScreen> createState() => _DuelScreenState();
 }
 
-class _DuelScreenState extends ConsumerState<DuelScreen> {
+class _DuelScreenState extends ConsumerState<DuelScreen>
+    with SingleTickerProviderStateMixin {
   DuelSession? _session;
   RoundResult? _lastResult;
   bool _resolved = false;
   bool _showReveal = false;
+  bool _animating = false;
+
+  // Animation controller for the card-play slide-in effect.
+  late final AnimationController _cardAnimController;
+  late final Animation<double> _playerCardSlide;
+  late final Animation<double> _opponentCardSlide;
+
+  @override
+  void initState() {
+    super.initState();
+    _cardAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    // Player card slides up from bottom (1.0 → 0.0 offset fraction of card height)
+    _playerCardSlide = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _cardAnimController, curve: Curves.easeOutCubic),
+    );
+    // Opponent card slides down from top
+    _opponentCardSlide = Tween<double>(begin: -1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _cardAnimController, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _cardAnimController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,13 +102,15 @@ class _DuelScreenState extends ConsumerState<DuelScreen> {
                   child: _BattleZone(
                     result: _lastResult,
                     showReveal: _showReveal,
+                    playerCardSlide: _playerCardSlide,
+                    opponentCardSlide: _opponentCardSlide,
                   ),
                 ),
                 const SizedBox(height: 8),
                 // ── BOTTOM: player ────────────────────────────────────
                 _PlayerZone(
                   session: session,
-                  resolved: _resolved,
+                  resolved: _resolved || _animating,
                   onCardTap: (card) => _play(card, session),
                 ),
               ],
@@ -89,25 +122,34 @@ class _DuelScreenState extends ConsumerState<DuelScreen> {
   }
 
   void _play(GameCard card, DuelSession session) {
+    if (_animating || _resolved) return;
+
     final result = session.playPlayerCard(card);
     setState(() {
       _lastResult = result;
       _showReveal = false;
-    });
-    // Trigger reveal animation on next frame so AnimatedScale/Opacity transitions fire.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _showReveal = true);
+      _animating = true;
     });
 
-    final outcome = session.outcome;
-    if (outcome != DuelOutcome.ongoing && !_resolved) {
-      _resolved = true;
-      Future.delayed(const Duration(milliseconds: 900), () {
-        if (mounted) _finish(outcome == DuelOutcome.playerWon);
-      });
-    } else {
-      setState(() {}); // refresh hand
-    }
+    // Reset and start the slide-in animation
+    _cardAnimController.reset();
+    _cardAnimController.forward().then((_) {
+      if (!mounted) return;
+      // After slide-in, trigger the reveal (badge + hint)
+      setState(() => _showReveal = true);
+
+      final outcome = session.outcome;
+      if (outcome != DuelOutcome.ongoing && !_resolved) {
+        _resolved = true;
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (mounted) _finish(outcome == DuelOutcome.playerWon);
+        });
+      } else {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) setState(() => _animating = false);
+        });
+      }
+    });
   }
 
   void _finish(bool won) {
@@ -148,11 +190,20 @@ class _OpponentZone extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        HpBar(
-          current: session.opponentCastleHp,
-          max: session.opponentConfig.startingCastleHp,
-          label: 'Замок врага',
-          color: const Color(0xFFE53935),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const DuelistPainterView(isOpponent: true, size: 44),
+            const SizedBox(width: 8),
+            Expanded(
+              child: HpBar(
+                current: session.opponentCastleHp,
+                max: session.opponentConfig.startingCastleHp,
+                label: 'Замок врага',
+                color: const Color(0xFFE53935),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         // Opponent hand as face-down cards
@@ -180,8 +231,15 @@ class _OpponentZone extends StatelessWidget {
 class _BattleZone extends StatelessWidget {
   final RoundResult? result;
   final bool showReveal;
+  final Animation<double> playerCardSlide;
+  final Animation<double> opponentCardSlide;
 
-  const _BattleZone({required this.result, required this.showReveal});
+  const _BattleZone({
+    required this.result,
+    required this.showReveal,
+    required this.playerCardSlide,
+    required this.opponentCardSlide,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -247,10 +305,18 @@ class _BattleZone extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Player card — fades in
-            AnimatedOpacity(
-              opacity: showReveal ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
+            // Player card — slides up from below and fades in
+            AnimatedBuilder(
+              animation: playerCardSlide,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, playerCardSlide.value * 80),
+                  child: Opacity(
+                    opacity: (1.0 - playerCardSlide.value.abs()).clamp(0.0, 1.0),
+                    child: child,
+                  ),
+                );
+              },
               child: GameCardView(
                 card: r.playerCard,
                 width: 80,
@@ -258,49 +324,60 @@ class _BattleZone extends StatelessWidget {
                 dimmed: !playerWon && !isTie,
               ),
             ),
-            // Center result badge
+            // Center result badge — pops in after slide
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: AnimatedScale(
                 scale: showReveal ? 1.0 : 0.6,
                 duration: const Duration(milliseconds: 400),
                 curve: Curves.elasticOut,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isTie
-                        ? Colors.white70
-                        : (playerWon
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFC62828)),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(60),
-                        blurRadius: 6,
+                child: AnimatedOpacity(
+                  opacity: showReveal ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isTie
+                          ? Colors.white70
+                          : (playerWon
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828)),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(60),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      badgeText,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isTie ? Colors.black87 : Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
                       ),
-                    ],
-                  ),
-                  child: Text(
-                    badgeText,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isTie ? Colors.black87 : Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
                     ),
                   ),
                 ),
               ),
             ),
-            // Opponent card — scales in (the "flip reveal")
-            AnimatedScale(
-              scale: showReveal ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 450),
-              curve: Curves.elasticOut,
+            // Opponent card — slides down from above
+            AnimatedBuilder(
+              animation: opponentCardSlide,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, opponentCardSlide.value * 80),
+                  child: Opacity(
+                    opacity: (1.0 - opponentCardSlide.value.abs()).clamp(0.0, 1.0),
+                    child: child,
+                  ),
+                );
+              },
               child: GameCardView(
                 card: r.opponentCard,
                 width: 80,
@@ -348,11 +425,20 @@ class _PlayerZone extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        HpBar(
-          current: session.playerCastleHp,
-          max: session.playerConfig.startingCastleHp,
-          label: 'Твой замок',
-          color: const Color(0xFF1565C0),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const DuelistPainterView(isOpponent: false, size: 44),
+            const SizedBox(width: 8),
+            Expanded(
+              child: HpBar(
+                current: session.playerCastleHp,
+                max: session.playerConfig.startingCastleHp,
+                label: 'Твой замок',
+                color: const Color(0xFF1565C0),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         SingleChildScrollView(
