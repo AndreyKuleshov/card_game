@@ -1,4 +1,3 @@
-import '../engine/element.dart';
 import '../engine/kingdom.dart';
 
 const _starterCommonIds = [
@@ -44,10 +43,11 @@ class SaveState {
   Map<String, dynamic> toJson() => {
         'crystals': crystals,
         'kingdom': {
-          'barracksLevel': kingdom.barracksLevel,
+          'fireLevel': kingdom.fireLevel,
+          'waterLevel': kingdom.waterLevel,
+          'natureLevel': kingdom.natureLevel,
           'wallLevel': kingdom.wallLevel,
           'mineLevel': kingdom.mineLevel,
-          'barracksElement': kingdom.barracksElement.name,
         },
         'ownedCardIds': ownedCardIds.toList(),
         'unlockedNodeIndex': unlockedNodeIndex,
@@ -58,11 +58,11 @@ class SaveState {
     return SaveState(
       crystals: json['crystals'] as int,
       kingdom: Kingdom(
-        barracksLevel: k['barracksLevel'] as int,
+        fireLevel: k['fireLevel'] as int,
+        waterLevel: k['waterLevel'] as int,
+        natureLevel: k['natureLevel'] as int,
         wallLevel: k['wallLevel'] as int,
         mineLevel: k['mineLevel'] as int,
-        barracksElement:
-            Element.values.firstWhere((e) => e.name == k['barracksElement']),
       ),
       ownedCardIds: (json['ownedCardIds'] as List<dynamic>).cast<String>().toSet(),
       unlockedNodeIndex: json['unlockedNodeIndex'] as int,

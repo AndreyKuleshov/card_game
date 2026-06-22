@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'save_state.dart';
 
 class SaveStore {
-  static const _key = 'save_v1';
+  static const _key = 'save_v2';
 
   Future<SaveState> load() async {
     final prefs = await SharedPreferences.getInstance();
