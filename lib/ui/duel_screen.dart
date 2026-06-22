@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/duel_engine.dart';
 import '../engine/duel_session.dart';
+import '../engine/element.dart';
 import '../engine/game_card.dart';
 import '../state/providers.dart';
 import 'duel_setup.dart';
@@ -202,16 +203,26 @@ class _BattleZone extends StatelessWidget {
     final playerWon = r.winner == RoundWinner.player;
     final isTie = r.winner == RoundWinner.tie;
 
-    // Element hint line
+    // Hint line: always show the effective powers (these already fold in the
+    // element bonus AND the Казарма bonus), and only call out "бьёт" when there
+    // is a genuine element advantage — same-element matchups have none.
     final pEmoji = GameColors.elementEmoji(r.playerCard.element);
     final oEmoji = GameColors.elementEmoji(r.opponentCard.element);
+    final power = 'сила ${r.playerEffectivePower} : ${r.opponentEffectivePower}';
     final String elementHint;
     if (isTie) {
-      elementHint = '$pEmoji vs $oEmoji — Ничья!';
+      elementHint = '$power — ничья';
     } else {
-      final winEmoji = playerWon ? pEmoji : oEmoji;
-      final loseEmoji = playerWon ? oEmoji : pEmoji;
-      elementHint = '$winEmoji бьёт $loseEmoji +${r.damage}';
+      final winnerBeats = playerWon
+          ? ElementRules.beats(r.playerCard.element, r.opponentCard.element)
+          : ElementRules.beats(r.opponentCard.element, r.playerCard.element);
+      if (winnerBeats) {
+        final winEmoji = playerWon ? pEmoji : oEmoji;
+        final loseEmoji = playerWon ? oEmoji : pEmoji;
+        elementHint = '$winEmoji бьёт $loseEmoji  •  $power';
+      } else {
+        elementHint = power;
+      }
     }
 
     // Result badge label
