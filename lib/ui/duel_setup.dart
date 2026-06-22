@@ -80,14 +80,17 @@ class DuelReward {
   });
 }
 
-/// Pure, deterministic computation of what a finished duel grants.
+/// Pure computation of what a finished duel grants.
 /// Mirrors the slice rules: crystals = 5 + mine bonus; unlock the next node
 /// only when this node is the current frontier and not the last; a boss grants
-/// its rewardTrumpId; a non-boss win rolls a seeded ~30% chest for a trump.
+/// its rewardTrumpId; a non-boss win rolls a ~30% chest for a trump.
+/// Pass a caller-owned [random] so chest drops are genuinely random in
+/// production and deterministically reproducible in tests.
 DuelReward computeDuelReward({
   required MapNode node,
   required SaveState save,
   required bool won,
+  required Random random,
 }) {
   if (!won) return const DuelReward(crystalsEarned: 0, unlockNext: false);
   final earned = 5 + save.kingdom.mineCrystalsPerWin;
@@ -96,7 +99,7 @@ DuelReward computeDuelReward({
   String? trump;
   if (node.rewardTrumpId != null) {
     trump = node.rewardTrumpId;
-  } else if (Random(node.index + 7).nextDouble() < 0.30) {
+  } else if (random.nextDouble() < 0.30) {
     trump = 'trump_frost_granny';
   }
   return DuelReward(crystalsEarned: earned, unlockNext: unlockNext, trumpGranted: trump);

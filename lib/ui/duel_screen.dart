@@ -111,7 +111,7 @@ class _DuelScreenState extends ConsumerState<DuelScreen> {
   void _finish(bool won) {
     final controller = ref.read(saveStateProvider.notifier);
     final save = ref.read(saveStateProvider);
-    final reward = computeDuelReward(node: widget.node, save: save, won: won);
+    final reward = computeDuelReward(node: widget.node, save: save, won: won, random: Random());
     if (won) {
       if (reward.crystalsEarned > 0) controller.addCrystals(reward.crystalsEarned);
       if (reward.unlockNext) controller.unlockNextNode();

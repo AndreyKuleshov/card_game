@@ -42,4 +42,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Создать козырь'), findsOneWidget);
   });
+
+  testWidgets('tapping craft button grants trump_lava_cat', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    final ctrl = container.read(saveStateProvider.notifier);
+    // Need enough crystals for two barracks upgrades (10+20) and the craft (40).
+    ctrl.addCrystals(200);
+    ctrl.tryUpgrade(BuildingType.barracks); // 1->2
+    ctrl.tryUpgrade(BuildingType.barracks); // 2->3
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: KingdomScreen()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать козырь (40💎)'));
+    await tester.pumpAndSettle();
+    expect(container.read(saveStateProvider).ownedCardIds, contains('trump_lava_cat'));
+  });
 }

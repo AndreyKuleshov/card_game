@@ -62,13 +62,12 @@ class KingdomScreen extends ConsumerWidget {
                   ),
                   if (type == BuildingType.barracks && k.barracksLevel >= 3)
                     Builder(builder: (context) {
-                      const craftId = 'trump_pumpkin_king';
-                      const altId = 'trump_frost_granny';
-                      final target = save.ownedCardIds.contains(craftId) ? altId : craftId;
-                      if (save.ownedCardIds.contains(target)) {
+                      const craftId = 'trump_lava_cat';
+                      final alreadyCrafted = save.ownedCardIds.contains(craftId);
+                      if (alreadyCrafted) {
                         return const Padding(
                           padding: EdgeInsets.all(8),
-                          child: Text('Все козыри кузницы созданы'),
+                          child: Text('Козырь кузницы создан'),
                         );
                       }
                       return Padding(
@@ -77,7 +76,7 @@ class KingdomScreen extends ConsumerWidget {
                           onPressed: save.crystals >= 40
                               ? () {
                                   controller.addCrystals(-40);
-                                  controller.grantCard(target);
+                                  controller.grantCard(craftId);
                                 }
                               : null,
                           child: const Text('Создать козырь (40💎)'),
