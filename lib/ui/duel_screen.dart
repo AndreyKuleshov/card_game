@@ -22,7 +22,7 @@ class DuelScreen extends ConsumerStatefulWidget {
 }
 
 class _DuelScreenState extends ConsumerState<DuelScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   DuelSession? _session;
   RoundResult? _lastResult;
   bool _resolved = false;
@@ -33,6 +33,10 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
   late final AnimationController _cardAnimController;
   late final Animation<double> _playerCardSlide;
   late final Animation<double> _opponentCardSlide;
+
+  // Animation controller for the clash effect (lunge / recoil / spark).
+  late final AnimationController _clashController;
+  late final Animation<double> _clashProgress;
 
   @override
   void initState() {
@@ -49,11 +53,21 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
     _opponentCardSlide = Tween<double>(begin: -1.0, end: 0.0).animate(
       CurvedAnimation(parent: _cardAnimController, curve: Curves.easeOutCubic),
     );
+
+    // Clash controller: 0 → 1 → 0 arc (lunge, impact, recoil)
+    _clashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _clashProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _clashController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     _cardAnimController.dispose();
+    _clashController.dispose();
     super.dispose();
   }
 
@@ -105,6 +119,7 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
                     showReveal: _showReveal,
                     playerCardSlide: _playerCardSlide,
                     opponentCardSlide: _opponentCardSlide,
+                    clashProgress: _clashProgress,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -134,22 +149,27 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
 
     // Reset and start the slide-in animation
     _cardAnimController.reset();
+    _clashController.reset();
     _cardAnimController.forward().then((_) {
       if (!mounted) return;
-      // After slide-in, trigger the reveal (badge + hint)
-      setState(() => _showReveal = true);
+      // After slide-in, play the clash animation
+      _clashController.forward().then((_) {
+        if (!mounted) return;
+        // After clash, trigger the reveal (badge + hint)
+        setState(() => _showReveal = true);
 
-      final outcome = session.outcome;
-      if (outcome != DuelOutcome.ongoing && !_resolved) {
-        _resolved = true;
-        Future.delayed(const Duration(milliseconds: 900), () {
-          if (mounted) _finish(outcome == DuelOutcome.playerWon);
-        });
-      } else {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) setState(() => _animating = false);
-        });
-      }
+        final outcome = session.outcome;
+        if (outcome != DuelOutcome.ongoing && !_resolved) {
+          _resolved = true;
+          Future.delayed(const Duration(milliseconds: 900), () {
+            if (mounted) _finish(outcome == DuelOutcome.playerWon);
+          });
+        } else {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) setState(() => _animating = false);
+          });
+        }
+      });
     });
   }
 
@@ -234,12 +254,14 @@ class _BattleZone extends StatelessWidget {
   final bool showReveal;
   final Animation<double> playerCardSlide;
   final Animation<double> opponentCardSlide;
+  final Animation<double> clashProgress;
 
   const _BattleZone({
     required this.result,
     required this.showReveal,
     required this.playerCardSlide,
     required this.opponentCardSlide,
+    required this.clashProgress,
   });
 
   @override
@@ -277,7 +299,7 @@ class _BattleZone extends StatelessWidget {
       final other = eff - card.power - elem; // Казарма / прочие бонусы
       final b = StringBuffer('${card.power}');
       if (elem > 0) b.write(' +$elem${GameColors.elementEmoji(card.element)}');
-      if (other > 0) b.write(' +$other🏹');
+      if (other > 0) b.write(' +$other⚒️');
       if (eff != card.power) b.write(' = $eff');
       return b.toString();
     }
@@ -311,92 +333,164 @@ class _BattleZone extends StatelessWidget {
       badgeText = 'Поражение\n−${r.damage} ⚔️';
     }
 
+    // Clash values derived from clashProgress (0→1 arc).
+    // Winner lunges toward loser (translate toward center + scale up),
+    // loser recoils away and dims. On tie, both bounce gently.
+    // clashProgress: 0=idle, 0.5=peak impact, 1=settled.
+    // We map it through a "lunge then return" curve: sin(π*t) for [0..1].
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+        Stack(
+          alignment: Alignment.center,
           children: [
-            // Player card — slides up from below and fades in
-            AnimatedBuilder(
-              animation: playerCardSlide,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, playerCardSlide.value * 80),
-                  child: Opacity(
-                    opacity: (1.0 - playerCardSlide.value.abs()).clamp(0.0, 1.0),
-                    child: child,
-                  ),
-                );
-              },
-              child: GameCardView(
-                card: r.playerCard,
-                width: 80,
-                highlighted: playerWon && !isTie,
-                dimmed: !playerWon && !isTie,
-              ),
-            ),
-            // Center result badge — pops in after slide
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: AnimatedScale(
-                scale: showReveal ? 1.0 : 0.6,
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.elasticOut,
-                child: AnimatedOpacity(
-                  opacity: showReveal ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isTie
-                          ? Colors.white70
-                          : (playerWon
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFC62828)),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(60),
-                          blurRadius: 6,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Player card — slides up from below, then clashes
+                AnimatedBuilder(
+                  animation: Listenable.merge([playerCardSlide, clashProgress]),
+                  builder: (context, child) {
+                    final slide = playerCardSlide.value * 80;
+                    final slideOpacity = (1.0 - playerCardSlide.value.abs()).clamp(0.0, 1.0);
+                    // Clash: lunge right toward center, scale up
+                    final lunge = isTie
+                        ? _bounceValue(clashProgress.value) * 6
+                        : (playerWon
+                            ? _lungeValue(clashProgress.value) * 22
+                            : -_recoilValue(clashProgress.value) * 10);
+                    final scaleBoost = isTie
+                        ? 1.0
+                        : (playerWon
+                            ? 1.0 + _lungeValue(clashProgress.value) * 0.14
+                            : 1.0 - _recoilValue(clashProgress.value) * 0.08);
+                    final clashOpacity = (!isTie && !playerWon)
+                        ? (1.0 - _recoilValue(clashProgress.value) * 0.35)
+                        : 1.0;
+                    return Transform.translate(
+                      offset: Offset(lunge, slide),
+                      child: Transform.scale(
+                        scale: scaleBoost,
+                        child: Opacity(
+                          opacity: (slideOpacity * clashOpacity).clamp(0.0, 1.0),
+                          child: child,
                         ),
-                      ],
-                    ),
-                    child: Text(
-                      badgeText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isTie ? Colors.black87 : Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13,
+                      ),
+                    );
+                  },
+                  child: GameCardView(
+                    card: r.playerCard,
+                    width: 80,
+                    highlighted: playerWon && !isTie,
+                    dimmed: !playerWon && !isTie,
+                  ),
+                ),
+                // Center result badge — pops in after clash
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: AnimatedScale(
+                    scale: showReveal ? 1.0 : 0.6,
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.elasticOut,
+                    child: AnimatedOpacity(
+                      opacity: showReveal ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isTie
+                              ? Colors.white70
+                              : (playerWon
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFC62828)),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(60),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          badgeText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: isTie ? Colors.black87 : Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                // Opponent card — slides down from above, then clashes
+                AnimatedBuilder(
+                  animation: Listenable.merge([opponentCardSlide, clashProgress]),
+                  builder: (context, child) {
+                    final slide = opponentCardSlide.value * 80;
+                    final slideOpacity = (1.0 - opponentCardSlide.value.abs()).clamp(0.0, 1.0);
+                    // Clash: lunge left toward center, scale up
+                    final lunge = isTie
+                        ? -_bounceValue(clashProgress.value) * 6
+                        : (!playerWon
+                            ? -_lungeValue(clashProgress.value) * 22
+                            : _recoilValue(clashProgress.value) * 10);
+                    final scaleBoost = isTie
+                        ? 1.0
+                        : (!playerWon
+                            ? 1.0 + _lungeValue(clashProgress.value) * 0.14
+                            : 1.0 - _recoilValue(clashProgress.value) * 0.08);
+                    final clashOpacity = (!isTie && playerWon)
+                        ? (1.0 - _recoilValue(clashProgress.value) * 0.35)
+                        : 1.0;
+                    return Transform.translate(
+                      offset: Offset(lunge, slide),
+                      child: Transform.scale(
+                        scale: scaleBoost,
+                        child: Opacity(
+                          opacity: (slideOpacity * clashOpacity).clamp(0.0, 1.0),
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: GameCardView(
+                    card: r.opponentCard,
+                    width: 80,
+                    highlighted: !playerWon && !isTie,
+                    dimmed: playerWon && !isTie,
+                  ),
+                ),
+              ],
             ),
-            // Opponent card — slides down from above
+            // Impact spark — briefly visible at peak clash (t≈0.5), then fades
             AnimatedBuilder(
-              animation: opponentCardSlide,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, opponentCardSlide.value * 80),
-                  child: Opacity(
-                    opacity: (1.0 - opponentCardSlide.value.abs()).clamp(0.0, 1.0),
-                    child: child,
+              animation: clashProgress,
+              builder: (context, _) {
+                final t = clashProgress.value;
+                // spark peaks around t=0.4..0.6
+                final sparkOpacity = (t < 0.5
+                    ? (t / 0.5).clamp(0.0, 1.0)
+                    : ((1.0 - t) / 0.5).clamp(0.0, 1.0));
+                final sparkScale = 0.5 + sparkOpacity * 0.8;
+                if (sparkOpacity < 0.05) return const SizedBox.shrink();
+                return Opacity(
+                  opacity: sparkOpacity,
+                  child: Transform.scale(
+                    scale: sparkScale,
+                    child: Text(
+                      isTie ? '💫' : '⚔️',
+                      style: const TextStyle(fontSize: 28),
+                    ),
                   ),
                 );
               },
-              child: GameCardView(
-                card: r.opponentCard,
-                width: 80,
-                highlighted: !playerWon && !isTie,
-                dimmed: playerWon && !isTie,
-              ),
             ),
           ],
         ),
@@ -415,6 +509,25 @@ class _BattleZone extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  // Lunge curve: rises fast to peak at t=0.5, then quickly returns.
+  // sin(π*t) gives a smooth arc from 0→1→0 over [0..1].
+  static double _lungeValue(double t) {
+    // Approximate sin(π*t) without dart:math import:
+    // Use a quadratic: 4*t*(1-t) peaks at 1.0 at t=0.5 (close to sin(π*t)).
+    return 4.0 * t * (1.0 - t);
+  }
+
+  // Recoil: builds from 0 and stays elevated (winner pushes away loser).
+  // Peaks around t=0.5 then eases back slightly.
+  static double _recoilValue(double t) {
+    return (t < 0.6) ? (t / 0.6).clamp(0.0, 1.0) : 1.0 - ((t - 0.6) / 0.4) * 0.3;
+  }
+
+  // Bounce: gentle symmetric bump (for tie).
+  static double _bounceValue(double t) {
+    return 4.0 * t * (1.0 - t) * 0.5;
   }
 }
 
