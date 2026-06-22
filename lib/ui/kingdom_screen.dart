@@ -29,6 +29,15 @@ class _KingdomScreenState extends ConsumerState<KingdomScreen> {
     BuildingType.mine: 'Шахта',
   };
 
+  // Level-independent purpose, shown in the panel even when not built yet.
+  static const _descriptions = {
+    BuildingType.fireForge: 'Усиливает 🔥 огненные карты в бою',
+    BuildingType.waterWell: 'Усиливает 💧 водяные карты в бою',
+    BuildingType.natureGrove: 'Усиливает 🌿 карты природы в бою',
+    BuildingType.wall: 'Повышает прочность замка — больше ХП',
+    BuildingType.mine: 'Приносит кристаллы 💎 за победу в дуэли',
+  };
+
   String _effect(BuildingType type, Kingdom k) {
     final level = k.levelOf(type);
     if (level == 0) return 'Не построено';
@@ -109,6 +118,7 @@ class _KingdomScreenState extends ConsumerState<KingdomScreen> {
                           _UpgradePanel(
                             type: _selected,
                             title: _titles[_selected]!,
+                            description: _descriptions[_selected]!,
                             level: k.levelOf(_selected),
                             effect: _effect(_selected, k),
                             crystals: save.crystals,
@@ -610,6 +620,7 @@ class _PositionedBuilding extends StatelessWidget {
 class _UpgradePanel extends StatelessWidget {
   final BuildingType type;
   final String title;
+  final String description;
   final int level;
   final String effect;
   final int crystals;
@@ -618,6 +629,7 @@ class _UpgradePanel extends StatelessWidget {
   const _UpgradePanel({
     required this.type,
     required this.title,
+    required this.description,
     required this.level,
     required this.effect,
     required this.crystals,
@@ -650,13 +662,19 @@ class _UpgradePanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 4),
                   _LevelPips(level: level),
                   const SizedBox(height: 4),
                   Text(
                     effect,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                      color: level == 0 ? Colors.grey : const Color(0xFFE65100),
                     ),
                   ),
                 ],
