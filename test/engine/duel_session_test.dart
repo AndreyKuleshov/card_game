@@ -67,26 +67,25 @@ void main() {
     expect(s.playerCastleHp, lessThan(10));
   });
 
-  test('duel resolves (no crash) when the opponent runs out of cards first', () {
-    // Opponent has fewer cards than the player and high castle HP so no KO ends
-    // it early. Once the opponent's hand empties, the duel must resolve instead
-    // of calling the AI with an empty hand (regression: Bad state: No element).
+  test('decks recycle; duel ends only when a castle is destroyed', () {
+    // Tiny decks but the player out-powers the opponent. With recycling the duel
+    // continues PAST the deck size (no card-exhaustion end) and resolves only
+    // when the enemy castle falls. Also guards the old empty-hand AI crash.
     final s = DuelSession(
-      playerDeck: Deck([
-        c('p1', Element.fire, 1), c('p2', Element.fire, 1), c('p3', Element.fire, 1),
-        c('p4', Element.fire, 1), c('p5', Element.fire, 1), c('p6', Element.fire, 1),
-      ]),
+      playerDeck: Deck([c('p1', Element.fire, 9), c('p2', Element.fire, 9)]),
       opponentDeck: Deck([c('o1', Element.fire, 1), c('o2', Element.fire, 1)]),
-      playerConfig: const DuelConfig(startingCastleHp: 100),
-      opponentConfig: const DuelConfig(startingCastleHp: 100),
+      playerConfig: const DuelConfig(startingCastleHp: 50),
+      opponentConfig: const DuelConfig(startingCastleHp: 30),
       ai: AiController(),
       random: Random(1),
     )..start();
 
-    var guard = 0;
-    while (s.outcome == DuelOutcome.ongoing && guard++ < 20) {
+    var rounds = 0;
+    while (s.outcome == DuelOutcome.ongoing && rounds++ < 500) {
       s.playPlayerCard(s.playerHand.first);
     }
-    expect(s.outcome, isNot(DuelOutcome.ongoing));
+    expect(s.outcome, DuelOutcome.playerWon);
+    expect(s.opponentCastleHp, lessThanOrEqualTo(0));
+    expect(rounds, greaterThan(2)); // played more rounds than the 2-card deck
   });
 }

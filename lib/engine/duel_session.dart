@@ -44,9 +44,22 @@ class DuelSession {
   }
 
   void _refill() {
-    _playerHand.addAll(_playerDeck.drawUpTo(playerConfig.handSize - _playerHand.length));
-    _opponentHand
-        .addAll(_opponentDeck.drawUpTo(opponentConfig.handSize - _opponentHand.length));
+    _fill(_playerDeck, _playerHand, playerConfig.handSize);
+    _fill(_opponentDeck, _opponentHand, opponentConfig.handSize);
+  }
+
+  // Draw up to [handSize], reshuffling the deck when it empties so cards never
+  // permanently run out — the duel ends only when a castle is destroyed.
+  void _fill(Deck deck, List<GameCard> hand, int handSize) {
+    while (hand.length < handSize) {
+      if (deck.isEmpty) {
+        if (deck.isExhaustible) break; // empty source deck: nothing to draw
+        deck.recycle(random);
+      }
+      final drawn = deck.drawUpTo(handSize - hand.length);
+      if (drawn.isEmpty) break;
+      hand.addAll(drawn);
+    }
   }
 
   RoundResult playPlayerCard(GameCard card) {
@@ -68,16 +81,10 @@ class DuelSession {
   }
 
   DuelOutcome get outcome {
+    // The duel ends ONLY when a castle is destroyed. Decks recycle (see _fill),
+    // so cards never permanently run out.
     if (opponentCastleHp <= 0) return DuelOutcome.playerWon;
     if (playerCastleHp <= 0) return DuelOutcome.opponentWon;
-    // A round needs both sides to field a card (hands are refilled after each
-    // round). If either side can no longer play, the duel resolves by castle HP
-    // — higher wins, ties favor the player.
-    if (_playerHand.isEmpty || _opponentHand.isEmpty) {
-      return playerCastleHp >= opponentCastleHp
-          ? DuelOutcome.playerWon
-          : DuelOutcome.opponentWon;
-    }
     return DuelOutcome.ongoing;
   }
 }
