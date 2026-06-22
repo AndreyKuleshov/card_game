@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme.dart';
 import 'world_map_screen.dart';
 
 class CardGameApp extends StatelessWidget {
@@ -9,7 +10,7 @@ class CardGameApp extends StatelessWidget {
     return MaterialApp(
       title: 'Карточное Королевство',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
+      theme: GameColors.warmTheme(),
       home: const WorldMapScreen(),
     );
   }

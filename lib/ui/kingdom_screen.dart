@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/kingdom.dart';
+import '../models/save_state.dart';
 import '../state/providers.dart';
+import 'theme.dart';
+import 'widgets.dart';
 
 class KingdomScreen extends ConsumerWidget {
   const KingdomScreen({super.key});
@@ -10,6 +13,12 @@ class KingdomScreen extends ConsumerWidget {
     BuildingType.barracks: 'Казарма',
     BuildingType.wall: 'Стена',
     BuildingType.mine: 'Шахта',
+  };
+
+  static const _icons = {
+    BuildingType.barracks: '🏹',
+    BuildingType.wall: '🧱',
+    BuildingType.mine: '⛏️',
   };
 
   String _effect(BuildingType type, Kingdom k) {
@@ -33,60 +42,193 @@ class KingdomScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Королевство'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: Text('💎 ${save.crystals}')),
-          ),
+          CrystalChip(amount: save.crystals),
+          const SizedBox(width: 12),
         ],
       ),
-      body: ListView(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: GameColors.backgroundStops,
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final type in BuildingType.values)
+              _BuildingCard(
+                type: type,
+                title: _titles[type]!,
+                icon: _icons[type]!,
+                level: k.levelOf(type),
+                effect: _effect(type, k),
+                crystals: save.crystals,
+                onUpgrade: () => controller.tryUpgrade(type),
+              ),
+            if (k.barracksLevel >= 3)
+              _CraftSection(save: save, controller: controller),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BuildingCard extends StatelessWidget {
+  final BuildingType type;
+  final String title;
+  final String icon;
+  final int level;
+  final String effect;
+  final int crystals;
+  final VoidCallback onUpgrade;
+
+  const _BuildingCard({
+    required this.type,
+    required this.title,
+    required this.icon,
+    required this.level,
+    required this.effect,
+    required this.crystals,
+    required this.onUpgrade,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cost = KingdomEconomy.upgradeCost(type, level);
+    final maxed = level >= 3;
+    final canAfford = crystals >= cost;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 36)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    _LevelPips(level: level),
+                    const SizedBox(height: 4),
+                    Text(
+                      effect,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              maxed
+                  ? const Chip(label: Text('МАКС'))
+                  : FilledButton(
+                      onPressed: canAfford ? onUpgrade : null,
+                      child: Text(
+                        'Улучшить\n($cost💎)',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelPips extends StatelessWidget {
+  final int level;
+
+  const _LevelPips({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(
+        3,
+        (i) => Padding(
+          padding: const EdgeInsets.only(right: 3),
+          child: Text(
+            i < level ? '●' : '○',
+            style: TextStyle(
+              fontSize: 14,
+              color: i < level ? const Color(0xFFF57C00) : Colors.grey,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CraftSection extends StatelessWidget {
+  final SaveState save;
+  final SaveController controller;
+
+  const _CraftSection({required this.save, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    const craftId = 'trump_lava_cat';
+    final alreadyCrafted = save.ownedCardIds.contains(craftId);
+
+    if (alreadyCrafted) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'Козырь кузницы создан 🏆',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
         padding: const EdgeInsets.all(16),
-        children: [
-          for (final type in BuildingType.values)
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    title: Text(_titles[type]!),
-                    subtitle: Text('Ур. ${k.levelOf(type)} — ${_effect(type, k)}'),
-                    trailing: k.levelOf(type) >= 3
-                        ? const Text('МАКС')
-                        : FilledButton(
-                            onPressed: save.crystals >=
-                                    KingdomEconomy.upgradeCost(type, k.levelOf(type))
-                                ? () => controller.tryUpgrade(type)
-                                : null,
-                            child: Text(
-                                'Улучшить (${KingdomEconomy.upgradeCost(type, k.levelOf(type))}💎)'),
-                          ),
-                  ),
-                  if (type == BuildingType.barracks && k.barracksLevel >= 3)
-                    Builder(builder: (context) {
-                      const craftId = 'trump_lava_cat';
-                      final alreadyCrafted = save.ownedCardIds.contains(craftId);
-                      if (alreadyCrafted) {
-                        return const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Text('Козырь кузницы создан'),
-                        );
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: FilledButton.tonal(
-                          onPressed: save.crystals >= 40
-                              ? () {
-                                  controller.addCrystals(-40);
-                                  controller.grantCard(craftId);
-                                }
-                              : null,
-                          child: const Text('Создать козырь (40💎)'),
-                        ),
-                      );
-                    }),
-                ],
+        child: Row(
+          children: [
+            const Text('🔮', style: TextStyle(fontSize: 32)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Особый козырь доступен в кузнице!',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-        ],
+            FilledButton.tonal(
+              onPressed: save.crystals >= 40
+                  ? () {
+                      controller.addCrystals(-40);
+                      controller.grantCard(craftId);
+                    }
+                  : null,
+              child: const Text(
+                'Создать козырь (40💎)',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
