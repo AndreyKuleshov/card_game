@@ -203,8 +203,12 @@ class _BuildingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     switch (type) {
-      case BuildingType.barracks:
-        _paintBarracks(canvas, size);
+      case BuildingType.fireForge:
+        _paintFireForge(canvas, size);
+      case BuildingType.waterWell:
+        _paintWaterWell(canvas, size);
+      case BuildingType.natureGrove:
+        _paintNatureGrove(canvas, size);
       case BuildingType.wall:
         _paintWall(canvas, size);
       case BuildingType.mine:
@@ -212,8 +216,9 @@ class _BuildingPainter extends CustomPainter {
     }
   }
 
-  // ── BARRACKS ──────────────────────────────────────────────────────────────
-  void _paintBarracks(Canvas canvas, Size size) {
+  // ── FIRE FORGE (Зажигалка) ───────────────────────────────────────────────
+  // A brazier/lighter with a growing flame — warm orange/red palette.
+  void _paintFireForge(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
 
@@ -226,60 +231,318 @@ class _BuildingPainter extends CustomPainter {
     final groundPaint = Paint()..color = const Color(0xFF8BC34A);
     canvas.drawRect(Rect.fromLTWH(0, h * 0.80, w, h * 0.20), groundPaint);
 
-    // Building height grows with level
-    final buildH = h * (0.25 + level * 0.12);
-    final buildTop = h * 0.80 - buildH;
+    // Brazier bowl — size grows with level
+    final bowlW = w * (0.30 + level * 0.08);
+    final bowlH = h * (0.12 + level * 0.04);
+    final bowlLeft = (w - bowlW) / 2;
+    final bowlTop = h * 0.62;
 
-    // Hall body
-    final wallPaint = Paint()..color = const Color(0xFFBCAAA4);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.10, buildTop, w * 0.80, buildH),
-        const Radius.circular(3),
-      ),
-      wallPaint,
-    );
-
-    // Roof (triangle)
-    final roofPaint = Paint()..color = const Color(0xFFF57C00);
-    final roofPath = Path()
-      ..moveTo(w * 0.05, buildTop)
-      ..lineTo(w / 2, buildTop - h * 0.15)
-      ..lineTo(w * 0.95, buildTop)
+    // Bowl body (dark metal)
+    final bowlPaint = Paint()..color = const Color(0xFF4E342E);
+    final bowlPath = Path()
+      ..moveTo(bowlLeft, bowlTop)
+      ..lineTo(bowlLeft + bowlW * 0.15, bowlTop + bowlH)
+      ..lineTo(bowlLeft + bowlW * 0.85, bowlTop + bowlH)
+      ..lineTo(bowlLeft + bowlW, bowlTop)
       ..close();
-    canvas.drawPath(roofPath, roofPaint);
+    canvas.drawPath(bowlPath, bowlPaint);
 
-    // Door
-    final doorPaint = Paint()..color = const Color(0xFF5D4037);
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTWH(w * 0.40, h * 0.80 - h * 0.18, w * 0.20, h * 0.18),
-        topLeft: const Radius.circular(4),
-        topRight: const Radius.circular(4),
-      ),
-      doorPaint,
-    );
-
-    // Crossed arrows symbol
-    final arrowPaint = Paint()
-      ..color = const Color(0xFFE64A19)
+    // Bowl rim highlight
+    final rimPaint = Paint()
+      ..color = const Color(0xFF795548)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
-    final cx = w * 0.50;
-    final cy = buildTop + buildH * 0.35;
-    final ar = h * 0.09;
-    // First arrow (top-left to bottom-right)
-    canvas.drawLine(Offset(cx - ar, cy - ar), Offset(cx + ar, cy + ar), arrowPaint);
-    canvas.drawLine(Offset(cx + ar, cy + ar), Offset(cx + ar * 0.4, cy + ar), arrowPaint);
-    canvas.drawLine(Offset(cx + ar, cy + ar), Offset(cx + ar, cy + ar * 0.4), arrowPaint);
-    // Second arrow (top-right to bottom-left)
-    canvas.drawLine(Offset(cx + ar, cy - ar), Offset(cx - ar, cy + ar), arrowPaint);
-    canvas.drawLine(Offset(cx - ar, cy + ar), Offset(cx - ar * 0.4, cy + ar), arrowPaint);
-    canvas.drawLine(Offset(cx - ar, cy + ar), Offset(cx - ar, cy + ar * 0.4), arrowPaint);
+    canvas.drawLine(Offset(bowlLeft, bowlTop), Offset(bowlLeft + bowlW, bowlTop), rimPaint);
 
-    // Level 3: flag banner
+    // Legs
+    final legPaint = Paint()
+      ..color = const Color(0xFF3E2723)
+      ..strokeWidth = w * 0.045
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    // Left leg
+    canvas.drawLine(
+      Offset(bowlLeft + bowlW * 0.25, bowlTop + bowlH),
+      Offset(bowlLeft + bowlW * 0.10, h * 0.80),
+      legPaint,
+    );
+    // Right leg
+    canvas.drawLine(
+      Offset(bowlLeft + bowlW * 0.75, bowlTop + bowlH),
+      Offset(bowlLeft + bowlW * 0.90, h * 0.80),
+      legPaint,
+    );
+
+    // Flame — layers, taller/wider with level
+    final flameH = h * (0.18 + level * 0.10);
+    final flameCX = w * 0.50;
+    final flameBaseY = bowlTop;
+
+    // Outer flame (orange)
+    final outerFlamePaint = Paint()..color = const Color(0xFFF57C00);
+    final flameW = bowlW * (0.55 + level * 0.08);
+    final outerPath = Path()
+      ..moveTo(flameCX - flameW / 2, flameBaseY)
+      ..quadraticBezierTo(
+        flameCX - flameW * 0.3, flameBaseY - flameH * 0.6,
+        flameCX, flameBaseY - flameH,
+      )
+      ..quadraticBezierTo(
+        flameCX + flameW * 0.3, flameBaseY - flameH * 0.6,
+        flameCX + flameW / 2, flameBaseY,
+      )
+      ..close();
+    canvas.drawPath(outerPath, outerFlamePaint);
+
+    // Middle flame (yellow-orange)
+    final midFlamePaint = Paint()..color = const Color(0xFFFFB300);
+    final midFlameW = flameW * 0.65;
+    final midPath = Path()
+      ..moveTo(flameCX - midFlameW / 2, flameBaseY)
+      ..quadraticBezierTo(
+        flameCX - midFlameW * 0.2, flameBaseY - flameH * 0.55,
+        flameCX, flameBaseY - flameH * 0.75,
+      )
+      ..quadraticBezierTo(
+        flameCX + midFlameW * 0.2, flameBaseY - flameH * 0.55,
+        flameCX + midFlameW / 2, flameBaseY,
+      )
+      ..close();
+    canvas.drawPath(midPath, midFlamePaint);
+
+    // Inner flame (bright yellow core)
+    if (level >= 2) {
+      final innerFlamePaint = Paint()..color = const Color(0xFFFFF9C4);
+      final innerW = flameW * 0.32;
+      final innerPath = Path()
+        ..moveTo(flameCX - innerW / 2, flameBaseY)
+        ..quadraticBezierTo(
+          flameCX, flameBaseY - flameH * 0.45,
+          flameCX + innerW / 2, flameBaseY,
+        )
+        ..close();
+      canvas.drawPath(innerPath, innerFlamePaint);
+    }
+
+    // Level 3: flag
     if (level >= 3) {
-      _drawSmallFlag(canvas, size, poleX: w * 0.50, poleBaseY: buildTop, color: const Color(0xFFE64A19));
+      _drawSmallFlag(canvas, size, poleX: w * 0.78, poleBaseY: bowlTop, color: const Color(0xFFE64A19));
+    }
+  }
+
+  // ── WATER WELL (Полторашка) ───────────────────────────────────────────────
+  // A 1.5L plastic water bottle — blue, bigger/more detail per level.
+  void _paintWaterWell(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    if (level == 0) {
+      _paintEmptyPlot(canvas, size);
+      return;
+    }
+
+    // Ground
+    final groundPaint = Paint()..color = const Color(0xFF8BC34A);
+    canvas.drawRect(Rect.fromLTWH(0, h * 0.80, w, h * 0.20), groundPaint);
+
+    // Bottle dimensions scale with level
+    final bottleW = w * (0.28 + level * 0.06);
+    final bottleH = h * (0.38 + level * 0.08);
+    final bottleCX = w * 0.50;
+    final bottleBottom = h * 0.80;
+    final bottleTop = bottleBottom - bottleH;
+    final bottleLeft = bottleCX - bottleW / 2;
+
+    // Main body (slightly tapered at top)
+    final bodyPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          const Color(0xFF64B5F6),
+          const Color(0xFF1E88E5),
+          const Color(0xFF64B5F6),
+        ],
+      ).createShader(Rect.fromLTWH(bottleLeft, bottleTop, bottleW, bottleH));
+
+    // Bottle shape: rectangle body with shoulder taper
+    final bodyPath = Path()
+      ..moveTo(bottleLeft, bottleBottom)
+      ..lineTo(bottleLeft, bottleTop + bottleH * 0.25) // body sides
+      ..quadraticBezierTo(
+        bottleLeft, bottleTop + bottleH * 0.12,
+        bottleLeft + bottleW * 0.15, bottleTop + bottleH * 0.08,
+      ) // shoulder left
+      ..lineTo(bottleLeft + bottleW * 0.35, bottleTop + bottleH * 0.05) // neck base left
+      ..lineTo(bottleLeft + bottleW * 0.65, bottleTop + bottleH * 0.05) // neck base right
+      ..quadraticBezierTo(
+        bottleLeft + bottleW * 0.85, bottleTop + bottleH * 0.08,
+        bottleLeft + bottleW, bottleTop + bottleH * 0.25,
+      ) // shoulder right
+      ..lineTo(bottleLeft + bottleW, bottleBottom)
+      ..close();
+    canvas.drawPath(bodyPath, bodyPaint);
+
+    // Cap (dark blue/navy)
+    final capPaint = Paint()..color = const Color(0xFF0D47A1);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(bottleLeft + bottleW * 0.35, bottleTop, bottleW * 0.30, bottleH * 0.05),
+        const Radius.circular(2),
+      ),
+      capPaint,
+    );
+
+    // Highlight shimmer on bottle
+    final shimmerPaint = Paint()
+      ..color = Colors.white.withAlpha(90)
+      ..strokeWidth = bottleW * 0.12
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(
+      Offset(bottleLeft + bottleW * 0.22, bottleTop + bottleH * 0.15),
+      Offset(bottleLeft + bottleW * 0.22, bottleBottom - bottleH * 0.12),
+      shimmerPaint,
+    );
+
+    // Label band
+    final labelPaint = Paint()..color = const Color(0xFF1565C0).withAlpha(180);
+    canvas.drawRect(
+      Rect.fromLTWH(bottleLeft, bottleTop + bottleH * 0.45, bottleW, bottleH * 0.20),
+      labelPaint,
+    );
+
+    // Level 2+: second bottle beside it
+    if (level >= 2) {
+      final smallW = bottleW * 0.65;
+      final smallH = bottleH * 0.75;
+      final smallLeft = bottleLeft + bottleW + w * 0.04;
+      final smallBottom = h * 0.80;
+      final smallTop = smallBottom - smallH;
+
+      final smallBodyPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [const Color(0xFF90CAF9), const Color(0xFF42A5F5)],
+        ).createShader(Rect.fromLTWH(smallLeft, smallTop, smallW, smallH));
+      final smallPath = Path()
+        ..moveTo(smallLeft, smallBottom)
+        ..lineTo(smallLeft, smallTop + smallH * 0.25)
+        ..quadraticBezierTo(smallLeft, smallTop + smallH * 0.12,
+            smallLeft + smallW * 0.15, smallTop + smallH * 0.08)
+        ..lineTo(smallLeft + smallW * 0.35, smallTop + smallH * 0.05)
+        ..lineTo(smallLeft + smallW * 0.65, smallTop + smallH * 0.05)
+        ..quadraticBezierTo(smallLeft + smallW * 0.85, smallTop + smallH * 0.08,
+            smallLeft + smallW, smallTop + smallH * 0.25)
+        ..lineTo(smallLeft + smallW, smallBottom)
+        ..close();
+      canvas.drawPath(smallPath, smallBodyPaint);
+
+      final smallCapPaint = Paint()..color = const Color(0xFF0D47A1);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(smallLeft + smallW * 0.35, smallTop, smallW * 0.30, smallH * 0.05),
+          const Radius.circular(2),
+        ),
+        smallCapPaint,
+      );
+    }
+
+    // Level 3: flag
+    if (level >= 3) {
+      _drawSmallFlag(canvas, size, poleX: w * 0.20, poleBaseY: bottleTop, color: const Color(0xFF1565C0));
+    }
+  }
+
+  // ── NATURE GROVE (Травка) ─────────────────────────────────────────────────
+  // Leafy grass / bush-tree patch — green, lusher per level.
+  void _paintNatureGrove(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    if (level == 0) {
+      _paintEmptyPlot(canvas, size);
+      return;
+    }
+
+    // Ground
+    final groundPaint = Paint()..color = const Color(0xFF8BC34A);
+    canvas.drawRect(Rect.fromLTWH(0, h * 0.80, w, h * 0.20), groundPaint);
+
+    // Draw grass tufts at base
+    _paintGrassTufts(canvas, size);
+
+    // Central bush/tree — grows with level
+    final cBushR = w * (0.18 + level * 0.06);
+    final cBushCX = w * 0.50;
+    final cBushBottom = h * 0.72;
+
+    // Trunk (for level 2+)
+    if (level >= 2) {
+      final trunkPaint = Paint()..color = const Color(0xFF6D4C41);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(cBushCX - w * 0.04, cBushBottom - h * 0.20, w * 0.08, h * 0.18),
+          const Radius.circular(2),
+        ),
+        trunkPaint,
+      );
+    }
+
+    // Dark foliage layer
+    final darkPaint = Paint()..color = const Color(0xFF2E7D32);
+    canvas.drawCircle(Offset(cBushCX, cBushBottom - cBushR * 0.4), cBushR, darkPaint);
+    canvas.drawCircle(Offset(cBushCX - cBushR * 0.55, cBushBottom - cBushR * 0.1), cBushR * 0.80, darkPaint);
+    canvas.drawCircle(Offset(cBushCX + cBushR * 0.55, cBushBottom - cBushR * 0.1), cBushR * 0.80, darkPaint);
+
+    // Mid foliage
+    final midPaint = Paint()..color = const Color(0xFF43A047);
+    canvas.drawCircle(Offset(cBushCX, cBushBottom - cBushR * 0.55), cBushR * 0.85, midPaint);
+    canvas.drawCircle(Offset(cBushCX - cBushR * 0.35, cBushBottom - cBushR * 0.3), cBushR * 0.65, midPaint);
+    canvas.drawCircle(Offset(cBushCX + cBushR * 0.35, cBushBottom - cBushR * 0.3), cBushR * 0.65, midPaint);
+
+    // Light highlight top
+    final lightPaint = Paint()..color = const Color(0xFF76FF03).withAlpha(160);
+    canvas.drawCircle(Offset(cBushCX - cBushR * 0.15, cBushBottom - cBushR * 0.85), cBushR * 0.45, lightPaint);
+
+    // Side bushes for level 2+
+    if (level >= 2) {
+      final sBushR = cBushR * 0.60;
+      // Left side bush
+      canvas.drawCircle(Offset(cBushCX - cBushR * 1.1, cBushBottom - sBushR * 0.4), sBushR, darkPaint);
+      canvas.drawCircle(Offset(cBushCX - cBushR * 1.1, cBushBottom - sBushR * 0.4), sBushR * 0.80, midPaint);
+      // Right side bush
+      canvas.drawCircle(Offset(cBushCX + cBushR * 1.1, cBushBottom - sBushR * 0.4), sBushR, darkPaint);
+      canvas.drawCircle(Offset(cBushCX + cBushR * 1.1, cBushBottom - sBushR * 0.4), sBushR * 0.80, midPaint);
+    }
+
+    // Level 3: small flowers/berries
+    if (level >= 3) {
+      final berryPaint = Paint()..color = const Color(0xFFE91E63);
+      canvas.drawCircle(Offset(cBushCX + cBushR * 0.3, cBushBottom - cBushR * 0.5), w * 0.04, berryPaint);
+      canvas.drawCircle(Offset(cBushCX - cBushR * 0.2, cBushBottom - cBushR * 0.7), w * 0.035, berryPaint);
+      canvas.drawCircle(Offset(cBushCX + cBushR * 0.55, cBushBottom - cBushR * 0.9), w * 0.03, berryPaint);
+      _drawSmallFlag(canvas, size, poleX: w * 0.82, poleBaseY: h * 0.50, color: const Color(0xFF388E3C));
+    }
+  }
+
+  void _paintGrassTufts(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final grassPaint = Paint()
+      ..color = const Color(0xFF33691E)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // Several grass tufts across the base
+    for (int i = 0; i < 7; i++) {
+      final gx = w * (0.08 + i * 0.13);
+      final gy = h * 0.79;
+      canvas.drawLine(Offset(gx, gy), Offset(gx - w * 0.015, gy - h * 0.06), grassPaint);
+      canvas.drawLine(Offset(gx, gy), Offset(gx, gy - h * 0.07), grassPaint);
+      canvas.drawLine(Offset(gx, gy), Offset(gx + w * 0.015, gy - h * 0.05), grassPaint);
     }
   }
 
