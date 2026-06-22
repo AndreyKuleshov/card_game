@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../engine/ability.dart';
 import '../engine/duel_engine.dart';
 import '../engine/duel_session.dart';
 import '../engine/element.dart';
@@ -266,12 +267,24 @@ class _BattleZone extends StatelessWidget {
     // is a genuine element advantage — same-element matchups have none.
     final pEmoji = GameColors.elementEmoji(r.playerCard.element);
     final oEmoji = GameColors.elementEmoji(r.opponentCard.element);
-    // Show base+bonus=effective so the jump from the card's printed power to its
-    // battle power (element advantage + Казарма) is obvious.
-    String side(int base, int eff) =>
-        eff > base ? '$base+${eff - base}=$eff' : '$eff';
-    final power = 'сила ${side(r.playerCard.power, r.playerEffectivePower)}'
-        ' : ${side(r.opponentCard.power, r.opponentEffectivePower)}';
+    // Break the bonus into parts so the Казарма bonus (+🏹) is visible
+    // separately from the element advantage (+stihiya emoji): "6 +3🔥 +1🏹 = 10".
+    String side(GameCard card, GameCard opp, int eff) {
+      final elem = (opp.ability != Ability.elementalShift &&
+              ElementRules.beats(card.element, opp.element))
+          ? kElementBonus
+          : 0;
+      final other = eff - card.power - elem; // Казарма / прочие бонусы
+      final b = StringBuffer('${card.power}');
+      if (elem > 0) b.write(' +$elem${GameColors.elementEmoji(card.element)}');
+      if (other > 0) b.write(' +$other🏹');
+      if (eff != card.power) b.write(' = $eff');
+      return b.toString();
+    }
+
+    final power =
+        'сила ${side(r.playerCard, r.opponentCard, r.playerEffectivePower)}'
+        ' : ${side(r.opponentCard, r.playerCard, r.opponentEffectivePower)}';
     final String elementHint;
     if (isTie) {
       elementHint = '$power — ничья';
