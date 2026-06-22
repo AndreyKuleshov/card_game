@@ -13,9 +13,10 @@ void main() {
       child: MaterialApp(home: KingdomScreen()),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Казарма'), findsOneWidget);
-    expect(find.text('Стена'), findsOneWidget);
-    expect(find.text('Шахта'), findsOneWidget);
+    // Titles appear on the scene AND in the panel, so we expect at least one.
+    expect(find.text('Казарма'), findsWidgets);
+    expect(find.text('Стена'), findsWidgets);
+    expect(find.text('Шахта'), findsWidgets);
   });
 
   testWidgets('craft button is absent below barracks level 3', (tester) async {
