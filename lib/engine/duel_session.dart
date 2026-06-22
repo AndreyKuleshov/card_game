@@ -70,11 +70,10 @@ class DuelSession {
   DuelOutcome get outcome {
     if (opponentCastleHp <= 0) return DuelOutcome.playerWon;
     if (playerCastleHp <= 0) return DuelOutcome.opponentWon;
-    final exhausted = _playerHand.isEmpty &&
-        _opponentHand.isEmpty &&
-        _playerDeck.isEmpty &&
-        _opponentDeck.isEmpty;
-    if (exhausted) {
+    // A round needs both sides to field a card (hands are refilled after each
+    // round). If either side can no longer play, the duel resolves by castle HP
+    // — higher wins, ties favor the player.
+    if (_playerHand.isEmpty || _opponentHand.isEmpty) {
       return playerCastleHp >= opponentCastleHp
           ? DuelOutcome.playerWon
           : DuelOutcome.opponentWon;

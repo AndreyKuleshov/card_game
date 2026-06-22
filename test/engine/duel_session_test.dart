@@ -66,4 +66,27 @@ void main() {
     expect(result.winner, RoundWinner.opponent);
     expect(s.playerCastleHp, lessThan(10));
   });
+
+  test('duel resolves (no crash) when the opponent runs out of cards first', () {
+    // Opponent has fewer cards than the player and high castle HP so no KO ends
+    // it early. Once the opponent's hand empties, the duel must resolve instead
+    // of calling the AI with an empty hand (regression: Bad state: No element).
+    final s = DuelSession(
+      playerDeck: Deck([
+        c('p1', Element.fire, 1), c('p2', Element.fire, 1), c('p3', Element.fire, 1),
+        c('p4', Element.fire, 1), c('p5', Element.fire, 1), c('p6', Element.fire, 1),
+      ]),
+      opponentDeck: Deck([c('o1', Element.fire, 1), c('o2', Element.fire, 1)]),
+      playerConfig: const DuelConfig(startingCastleHp: 100),
+      opponentConfig: const DuelConfig(startingCastleHp: 100),
+      ai: AiController(),
+      random: Random(1),
+    )..start();
+
+    var guard = 0;
+    while (s.outcome == DuelOutcome.ongoing && guard++ < 20) {
+      s.playPlayerCard(s.playerHand.first);
+    }
+    expect(s.outcome, isNot(DuelOutcome.ongoing));
+  });
 }
