@@ -73,8 +73,8 @@ void main() {
       expect(r.damage, 0);
     });
 
-    test('barracks bonus boosts the matching player element', () {
-      const boosted = DuelConfig(barracksElement: Element.fire, barracksBonus: 3);
+    test('forge bonus boosts the matching player element', () {
+      const boosted = DuelConfig(elementBonuses: {Element.fire: 3});
       // Player fire(5)+3 = 8 vs opponent fire(6).
       final r = DuelEngine.resolveRound(
         playerCard: card('p', Element.fire, 5),

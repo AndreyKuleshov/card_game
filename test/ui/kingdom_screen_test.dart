@@ -7,19 +7,21 @@ import 'package:card_game/state/providers.dart';
 import 'package:card_game/engine/kingdom.dart';
 
 void main() {
-  testWidgets('kingdom screen lists three buildings', (tester) async {
+  testWidgets('kingdom screen lists five buildings', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: KingdomScreen()),
     ));
     await tester.pumpAndSettle();
     // Titles appear on the scene AND in the panel, so we expect at least one.
-    expect(find.text('Казарма'), findsWidgets);
+    expect(find.text('Зажигалка'), findsWidgets);
+    expect(find.text('Полторашка'), findsWidgets);
+    expect(find.text('Травка'), findsWidgets);
     expect(find.text('Стена'), findsWidgets);
     expect(find.text('Шахта'), findsWidgets);
   });
 
-  testWidgets('craft button is absent below barracks level 3', (tester) async {
+  testWidgets('craft button is absent below fireForge level 3', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: KingdomScreen()),
@@ -28,15 +30,15 @@ void main() {
     expect(find.textContaining('Создать козырь'), findsNothing);
   });
 
-  testWidgets('craft button appears only at barracks level 3', (tester) async {
+  testWidgets('craft button appears only at fireForge level 3', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer();
-    // Force barracks to level 3 with plenty of crystals.
+    // Force fireForge to level 3 with plenty of crystals.
     final ctrl = container.read(saveStateProvider.notifier);
     ctrl.addCrystals(100);
-    ctrl.tryUpgrade(BuildingType.barracks); // 0->1
-    ctrl.tryUpgrade(BuildingType.barracks); // 1->2
-    ctrl.tryUpgrade(BuildingType.barracks); // 2->3
+    ctrl.tryUpgrade(BuildingType.fireForge); // 0->1
+    ctrl.tryUpgrade(BuildingType.fireForge); // 1->2
+    ctrl.tryUpgrade(BuildingType.fireForge); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: const MaterialApp(home: KingdomScreen()),
@@ -49,11 +51,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer();
     final ctrl = container.read(saveStateProvider.notifier);
-    // Need enough crystals to build barracks 0->3 (5+10+25) and craft (40).
+    // Need enough crystals to build fireForge 0->3 (5+10+25) and craft (40).
     ctrl.addCrystals(200);
-    ctrl.tryUpgrade(BuildingType.barracks); // 0->1
-    ctrl.tryUpgrade(BuildingType.barracks); // 1->2
-    ctrl.tryUpgrade(BuildingType.barracks); // 2->3
+    ctrl.tryUpgrade(BuildingType.fireForge); // 0->1
+    ctrl.tryUpgrade(BuildingType.fireForge); // 1->2
+    ctrl.tryUpgrade(BuildingType.fireForge); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: const MaterialApp(home: KingdomScreen()),

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:card_game/engine/element.dart';
 import 'package:card_game/engine/kingdom.dart';
 import 'package:card_game/models/save_state.dart';
 import 'package:card_game/models/save_store.dart';
@@ -17,14 +16,23 @@ void main() {
   test('json round-trip preserves all fields', () {
     final s = SaveState(
       crystals: 42,
-      kingdom: const Kingdom(barracksLevel: 2, wallLevel: 3, mineLevel: 1, barracksElement: Element.water),
+      kingdom: const Kingdom(
+        fireLevel: 2,
+        waterLevel: 1,
+        natureLevel: 3,
+        wallLevel: 3,
+        mineLevel: 1,
+      ),
       ownedCardIds: {'a', 'b'},
       unlockedNodeIndex: 2,
     );
     final restored = SaveState.fromJson(s.toJson());
     expect(restored.crystals, 42);
+    expect(restored.kingdom.fireLevel, 2);
+    expect(restored.kingdom.waterLevel, 1);
+    expect(restored.kingdom.natureLevel, 3);
     expect(restored.kingdom.wallLevel, 3);
-    expect(restored.kingdom.barracksElement, Element.water);
+    expect(restored.kingdom.mineLevel, 1);
     expect(restored.ownedCardIds, {'a', 'b'});
     expect(restored.unlockedNodeIndex, 2);
   });
