@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/providers.dart';
+import 'collection_screen.dart';
 import 'duel_setup.dart';
 import 'duel_screen.dart';
 import 'kingdom_screen.dart';
@@ -19,6 +20,13 @@ class WorldMapScreen extends ConsumerWidget {
         actions: [
           CrystalChip(amount: save.crystals),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.collections_bookmark),
+            tooltip: 'Коллекция',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CollectionScreen()),
+            ),
+          ),
           IconButton(
             icon: const Text('🏰', style: TextStyle(fontSize: 22)),
             tooltip: 'Королевство',
