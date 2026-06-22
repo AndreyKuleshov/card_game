@@ -18,6 +18,15 @@ void main() {
     expect(find.text('Шахта'), findsOneWidget);
   });
 
+  testWidgets('craft button is absent below barracks level 3', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: KingdomScreen()),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Создать козырь'), findsNothing);
+  });
+
   testWidgets('craft button appears only at barracks level 3', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer();

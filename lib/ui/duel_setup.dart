@@ -69,6 +69,39 @@ List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
   return deck;
 }
 
+class DuelReward {
+  final int crystalsEarned;
+  final bool unlockNext;
+  final String? trumpGranted;
+  const DuelReward({
+    required this.crystalsEarned,
+    required this.unlockNext,
+    this.trumpGranted,
+  });
+}
+
+/// Pure, deterministic computation of what a finished duel grants.
+/// Mirrors the slice rules: crystals = 5 + mine bonus; unlock the next node
+/// only when this node is the current frontier and not the last; a boss grants
+/// its rewardTrumpId; a non-boss win rolls a seeded ~30% chest for a trump.
+DuelReward computeDuelReward({
+  required MapNode node,
+  required SaveState save,
+  required bool won,
+}) {
+  if (!won) return const DuelReward(crystalsEarned: 0, unlockNext: false);
+  final earned = 5 + save.kingdom.mineCrystalsPerWin;
+  final unlockNext =
+      node.index >= save.unlockedNodeIndex && node.index < kSliceNodes.length - 1;
+  String? trump;
+  if (node.rewardTrumpId != null) {
+    trump = node.rewardTrumpId;
+  } else if (Random(node.index + 7).nextDouble() < 0.30) {
+    trump = 'trump_frost_granny';
+  }
+  return DuelReward(crystalsEarned: earned, unlockNext: unlockNext, trumpGranted: trump);
+}
+
 DuelSession buildSession({
   required SaveState save,
   required List<GameCard> allCards,

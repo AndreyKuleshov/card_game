@@ -91,7 +91,7 @@ class _DuelScreenState extends ConsumerState<DuelScreen> {
   }
 
   String _elementEmoji(GameCard c) =>
-      {'fire': '🔥', 'nature': '🌿', 'water': '💧'}[c.element.name]!;
+      {'fire': '🔥', 'nature': '🌿', 'water': '💧'}[c.element.name] ?? '❔';
 
   void _play(GameCard card, DuelSession session) {
     final result = session.playPlayerCard(card);
@@ -111,26 +111,18 @@ class _DuelScreenState extends ConsumerState<DuelScreen> {
   void _finish(bool won) {
     final controller = ref.read(saveStateProvider.notifier);
     final save = ref.read(saveStateProvider);
-    int earned = 0;
-    String? trump;
+    final reward = computeDuelReward(node: widget.node, save: save, won: won);
     if (won) {
-      earned = 5 + save.kingdom.mineCrystalsPerWin;
-      controller.addCrystals(earned);
-      if (widget.node.index >= save.unlockedNodeIndex &&
-          widget.node.index < kSliceNodes.length - 1) {
-        controller.unlockNextNode();
-      }
-      if (widget.node.rewardTrumpId != null) {
-        trump = widget.node.rewardTrumpId;
-        controller.grantCard(trump!);
-      } else if (Random(widget.node.index + 7).nextDouble() < 0.30) {
-        trump = 'trump_frost_granny';
-        controller.grantCard(trump);
-      }
+      if (reward.crystalsEarned > 0) controller.addCrystals(reward.crystalsEarned);
+      if (reward.unlockNext) controller.unlockNextNode();
+      if (reward.trumpGranted != null) controller.grantCard(reward.trumpGranted!);
     }
     Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) =>
-          RewardScreen(won: won, crystalsEarned: earned, trumpGranted: trump),
+      builder: (_) => RewardScreen(
+        won: won,
+        crystalsEarned: reward.crystalsEarned,
+        trumpGranted: reward.trumpGranted,
+      ),
     ));
   }
 }
