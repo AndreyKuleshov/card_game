@@ -67,9 +67,10 @@ class _KingdomScreenState extends ConsumerState<KingdomScreen> {
               final availW = constraints.maxWidth;
               final availH = constraints.maxHeight;
 
-              // Scene: constrained to max 520 wide; height ~ 58% of available.
-              final sceneW = availW.clamp(0.0, 520.0);
-              final sceneH = (availH * 0.58).clamp(180.0, 320.0);
+              // Scene: wider cap (600px), taller height share for visual focus.
+              final sceneW = availW.clamp(0.0, 600.0);
+              // On tall phones give it 62%, clamp to [220, 400].
+              final sceneH = (availH * 0.62).clamp(220.0, 400.0);
 
               return Column(
                 children: [
@@ -152,26 +153,27 @@ class _VillageScene extends StatelessWidget {
             final w = constraints.maxWidth;
             final h = constraints.maxHeight;
 
-            // Castle centred slightly above middle.
-            final castleSize = (w * 0.28).clamp(64.0, 110.0);
+            // Castle centred slightly above middle — a little bigger now.
+            final castleSize = (w * 0.26).clamp(72.0, 130.0);
 
             // Building widget size — scales with scene width.
-            final bldSize = (w * 0.18).clamp(48.0, 72.0);
+            final bldSize = (w * 0.17).clamp(52.0, 80.0);
 
             // Positions (fraction of scene size).
             // barracks: upper-left, mine: upper-right, wall: front-centre.
             final positions = {
-              BuildingType.barracks: Offset(w * 0.13, h * 0.28),
-              BuildingType.mine: Offset(w * 0.69, h * 0.28),
-              BuildingType.wall: Offset(w * 0.38, h * 0.55),
+              BuildingType.barracks: Offset(w * 0.07, h * 0.30),
+              BuildingType.mine: Offset(w * 0.75, h * 0.30),
+              BuildingType.wall: Offset(w * 0.40, h * 0.57),
             };
 
             return Stack(
+              clipBehavior: Clip.hardEdge,
               children: [
                 // Castle at centre/back.
                 Positioned(
                   left: w / 2 - castleSize / 2,
-                  top: h * 0.08,
+                  top: h * 0.06,
                   child: CastlePainterView(size: castleSize),
                 ),
 
@@ -196,7 +198,7 @@ class _VillageScene extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _MeadowPainter — the "plot of land" background
+// _MeadowPainter — enriched background with env detail
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _MeadowPainter extends CustomPainter {
@@ -205,51 +207,326 @@ class _MeadowPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Sky gradient (top portion).
-    final skyRect = Rect.fromLTWH(0, 0, w, h * 0.50);
+    // ── Sky gradient ──────────────────────────────────────────────────────────
+    final skyRect = Rect.fromLTWH(0, 0, w, h * 0.52);
     final skyPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFF90CAF9), Color(0xFFB3E5FC)],
+        colors: [Color(0xFF7BBFED), Color(0xFFB8DEFA)],
       ).createShader(skyRect);
     canvas.drawRect(skyRect, skyPaint);
 
-    // Meadow (rounded rect in lower portion).
+    // Fluffy cloud blobs (deterministic positions)
+    _drawCloud(canvas, w * 0.12, h * 0.09, w * 0.14);
+    _drawCloud(canvas, w * 0.55, h * 0.06, w * 0.11);
+    _drawCloud(canvas, w * 0.80, h * 0.12, w * 0.09);
+
+    // ── Meadow ────────────────────────────────────────────────────────────────
     final meadowRect = RRect.fromRectAndCorners(
-      Rect.fromLTWH(0, h * 0.35, w, h * 0.65),
-      topLeft: const Radius.circular(32),
-      topRight: const Radius.circular(32),
+      Rect.fromLTWH(0, h * 0.34, w, h * 0.66),
+      topLeft: const Radius.circular(36),
+      topRight: const Radius.circular(36),
     );
     final meadowPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFF8BC34A), Color(0xFF558B2F)],
-      ).createShader(Rect.fromLTWH(0, h * 0.35, w, h * 0.65));
+      ).createShader(Rect.fromLTWH(0, h * 0.34, w, h * 0.66));
     canvas.drawRRect(meadowRect, meadowPaint);
 
-    // Dirt path from castle to bottom (subtle).
-    final pathPaint = Paint()..color = const Color(0xFFD7CCC8).withAlpha(120);
-    final dirtPath = Path()
-      ..moveTo(w * 0.43, h * 0.45)
-      ..quadraticBezierTo(w * 0.50, h * 0.70, w * 0.50, h)
-      ..quadraticBezierTo(w * 0.57, h * 0.70, w * 0.57, h * 0.45)
-      ..close();
-    canvas.drawPath(dirtPath, pathPaint);
+    // Subtle ground shading strip at horizon
+    final horizonPaint = Paint()
+      ..color = const Color(0xFF6AAF2E).withAlpha(100)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawRect(Rect.fromLTWH(0, h * 0.34, w, h * 0.08), horizonPaint);
 
-    // Decorative small flowers (dots).
-    final flowerPaint = Paint()..color = const Color(0xFFFFF176).withAlpha(180);
-    for (final pos in [
-      Offset(w * 0.08, h * 0.62),
-      Offset(w * 0.18, h * 0.78),
-      Offset(w * 0.82, h * 0.58),
-      Offset(w * 0.90, h * 0.75),
-      Offset(w * 0.30, h * 0.88),
-      Offset(w * 0.70, h * 0.85),
-    ]) {
-      canvas.drawCircle(pos, 4, flowerPaint);
+    // ── Dirt road network ─────────────────────────────────────────────────────
+    // Castle sits at centre ~(w*0.5, h*0.15). Paths fan out to each building.
+    final castleCX = w * 0.50;
+    final castleCY = h * 0.28; // approx gate bottom
+
+    // Path paint — warm sandy dirt
+    final pathPaint = Paint()
+      ..color = const Color(0xFFD4A96A).withAlpha(210)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // To barracks (upper-left ~w*0.12, h*0.40)
+    pathPaint.strokeWidth = w * 0.045;
+    _drawRoadSegment(
+      canvas,
+      pathPaint,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.30, h * 0.36),
+      end: Offset(w * 0.17, h * 0.48),
+    );
+
+    // To mine (upper-right ~w*0.80, h*0.40)
+    _drawRoadSegment(
+      canvas,
+      pathPaint,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.70, h * 0.36),
+      end: Offset(w * 0.82, h * 0.48),
+    );
+
+    // To wall (front-centre ~w*0.50, h*0.65)
+    _drawRoadSegment(
+      canvas,
+      pathPaint,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.50, h * 0.48),
+      end: Offset(w * 0.52, h * 0.66),
+    );
+
+    // Road edge highlights (lighter inner stripe)
+    final pathHighlight = Paint()
+      ..color = const Color(0xFFEDD08A).withAlpha(120)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.018;
+    _drawRoadSegment(
+      canvas,
+      pathHighlight,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.30, h * 0.36),
+      end: Offset(w * 0.17, h * 0.48),
+    );
+    _drawRoadSegment(
+      canvas,
+      pathHighlight,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.70, h * 0.36),
+      end: Offset(w * 0.82, h * 0.48),
+    );
+    _drawRoadSegment(
+      canvas,
+      pathHighlight,
+      start: Offset(castleCX, castleCY),
+      ctrl: Offset(w * 0.50, h * 0.48),
+      end: Offset(w * 0.52, h * 0.66),
+    );
+
+    // ── Small pond (lower-right corner) ──────────────────────────────────────
+    _drawPond(canvas, w * 0.82, h * 0.80, w * 0.09, h * 0.055);
+
+    // ── Fence segments (lower edge, flanking buildings) ───────────────────────
+    _drawFenceRow(canvas, w * 0.02, h * 0.88, w * 0.14, h);
+    _drawFenceRow(canvas, w * 0.84, h * 0.88, w * 0.98, h);
+
+    // ── Trees ─────────────────────────────────────────────────────────────────
+    // Left cluster
+    _drawTree(canvas, w * 0.04, h * 0.62, w * 0.065);
+    _drawTree(canvas, w * 0.01, h * 0.54, w * 0.055);
+    // Right cluster
+    _drawTree(canvas, w * 0.94, h * 0.58, w * 0.065);
+    _drawTree(canvas, w * 0.97, h * 0.68, w * 0.055);
+    // Back left (skyline, smaller)
+    _drawTree(canvas, w * 0.10, h * 0.42, w * 0.04);
+    // Back right
+    _drawTree(canvas, w * 0.88, h * 0.44, w * 0.04);
+
+    // ── Bushes ────────────────────────────────────────────────────────────────
+    _drawBush(canvas, w * 0.22, h * 0.70, w * 0.05);
+    _drawBush(canvas, w * 0.63, h * 0.72, w * 0.05);
+    _drawBush(canvas, w * 0.12, h * 0.80, w * 0.04);
+    _drawBush(canvas, w * 0.73, h * 0.82, w * 0.04);
+
+    // ── Flowers (scattered dots) ──────────────────────────────────────────────
+    const flowerPositions = [
+      [0.06, 0.72],
+      [0.16, 0.84],
+      [0.27, 0.91],
+      [0.36, 0.78],
+      [0.45, 0.87],
+      [0.55, 0.74],
+      [0.67, 0.88],
+      [0.78, 0.70],
+      [0.86, 0.92],
+      [0.92, 0.78],
+    ];
+    // Alternate yellow and pink flowers
+    for (int i = 0; i < flowerPositions.length; i++) {
+      final fx = w * flowerPositions[i][0];
+      final fy = h * flowerPositions[i][1];
+      final isYellow = i.isEven;
+      _drawFlower(canvas, fx, fy, w * 0.012, isYellow);
     }
+  }
+
+  // ── Cloud ─────────────────────────────────────────────────────────────────
+  void _drawCloud(Canvas canvas, double cx, double cy, double r) {
+    final paint = Paint()..color = Colors.white.withAlpha(210);
+    canvas.drawCircle(Offset(cx, cy), r, paint);
+    canvas.drawCircle(Offset(cx + r * 0.8, cy + r * 0.15), r * 0.75, paint);
+    canvas.drawCircle(Offset(cx - r * 0.7, cy + r * 0.20), r * 0.65, paint);
+    canvas.drawCircle(Offset(cx + r * 0.3, cy + r * 0.35), r * 0.70, paint);
+  }
+
+  // ── Road segment (quadratic bezier stroke) ────────────────────────────────
+  void _drawRoadSegment(
+    Canvas canvas,
+    Paint paint, {
+    required Offset start,
+    required Offset ctrl,
+    required Offset end,
+  }) {
+    final path = Path()
+      ..moveTo(start.dx, start.dy)
+      ..quadraticBezierTo(ctrl.dx, ctrl.dy, end.dx, end.dy);
+    canvas.drawPath(path, paint);
+  }
+
+  // ── Pond ──────────────────────────────────────────────────────────────────
+  void _drawPond(Canvas canvas, double cx, double cy, double rx, double ry) {
+    final pondRect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: rx * 2,
+      height: ry * 2,
+    );
+    // Water body
+    final waterPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF64B5F6), Color(0xFF1E88E5)],
+      ).createShader(pondRect);
+    canvas.drawOval(pondRect, waterPaint);
+    // Highlight shimmer
+    final shimmerPaint = Paint()
+      ..color = Colors.white.withAlpha(80)
+      ..strokeWidth = rx * 0.4
+      ..style = PaintingStyle.stroke;
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset(cx - rx * 0.2, cy - ry * 0.2), width: rx * 0.9, height: ry * 0.5),
+      -0.9,
+      1.2,
+      false,
+      shimmerPaint,
+    );
+    // Rim
+    final rimPaint = Paint()
+      ..color = const Color(0xFF4CAF50).withAlpha(180)
+      ..strokeWidth = rx * 0.25
+      ..style = PaintingStyle.stroke;
+    canvas.drawOval(pondRect, rimPaint);
+  }
+
+  // ── Fence row ────────────────────────────────────────────────────────────
+  void _drawFenceRow(Canvas canvas, double x1, double y, double x2, double h) {
+    final postPaint = Paint()..color = const Color(0xFF8D6E63);
+    final railPaint = Paint()
+      ..color = const Color(0xFFBCAAA4)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const postW = 3.0;
+    final postH = h * 0.07;
+    final spacing = (x2 - x1) / 5;
+
+    // Rails
+    canvas.drawLine(Offset(x1, y + postH * 0.30), Offset(x2, y + postH * 0.30), railPaint);
+    canvas.drawLine(Offset(x1, y + postH * 0.65), Offset(x2, y + postH * 0.65), railPaint);
+
+    // Posts
+    for (int i = 0; i <= 5; i++) {
+      final px = x1 + i * spacing;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(px - postW / 2, y, postW, postH),
+          const Radius.circular(1),
+        ),
+        postPaint,
+      );
+      // Pointed cap
+      final capPath = Path()
+        ..moveTo(px - postW / 2, y)
+        ..lineTo(px, y - postH * 0.18)
+        ..lineTo(px + postW / 2, y)
+        ..close();
+      canvas.drawPath(capPath, postPaint);
+    }
+  }
+
+  // ── Tree ─────────────────────────────────────────────────────────────────
+  void _drawTree(Canvas canvas, double cx, double groundY, double r) {
+    // Trunk
+    final trunkPaint = Paint()..color = const Color(0xFF6D4C41);
+    final trunkW = r * 0.35;
+    final trunkH = r * 0.70;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - trunkW / 2, groundY - trunkH, trunkW, trunkH),
+        const Radius.circular(2),
+      ),
+      trunkPaint,
+    );
+
+    // Shadow on trunk
+    final shadowPaint = Paint()..color = const Color(0xFF4E342E).withAlpha(80);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx, groundY - trunkH, trunkW * 0.4, trunkH),
+        const Radius.circular(2),
+      ),
+      shadowPaint,
+    );
+
+    // Foliage (layered blobs, dark → light)
+    final darkLeaf = Paint()..color = const Color(0xFF388E3C);
+    final midLeaf = Paint()..color = const Color(0xFF66BB6A);
+    final lightLeaf = Paint()..color = const Color(0xFF81C784);
+
+    canvas.drawCircle(Offset(cx, groundY - trunkH - r * 0.55), r, darkLeaf);
+    canvas.drawCircle(Offset(cx - r * 0.4, groundY - trunkH - r * 0.35), r * 0.75, darkLeaf);
+    canvas.drawCircle(Offset(cx + r * 0.4, groundY - trunkH - r * 0.35), r * 0.75, darkLeaf);
+    canvas.drawCircle(Offset(cx, groundY - trunkH - r * 0.55), r * 0.80, midLeaf);
+    canvas.drawCircle(Offset(cx - r * 0.15, groundY - trunkH - r * 0.75), r * 0.55, lightLeaf);
+  }
+
+  // ── Bush ─────────────────────────────────────────────────────────────────
+  void _drawBush(Canvas canvas, double cx, double groundY, double r) {
+    final darkPaint = Paint()..color = const Color(0xFF388E3C);
+    final midPaint = Paint()..color = const Color(0xFF558B2F);
+
+    canvas.drawCircle(Offset(cx, groundY), r, darkPaint);
+    canvas.drawCircle(Offset(cx - r * 0.55, groundY + r * 0.15), r * 0.75, darkPaint);
+    canvas.drawCircle(Offset(cx + r * 0.55, groundY + r * 0.15), r * 0.75, darkPaint);
+    canvas.drawCircle(Offset(cx, groundY - r * 0.20), r * 0.70, midPaint);
+  }
+
+  // ── Flower ────────────────────────────────────────────────────────────────
+  void _drawFlower(Canvas canvas, double cx, double cy, double r, bool yellow) {
+    final petalColor = yellow ? const Color(0xFFFFF176) : const Color(0xFFF48FB1);
+    final centerColor = yellow ? const Color(0xFFFF8F00) : const Color(0xFFE91E63);
+
+    final petalPaint = Paint()..color = petalColor.withAlpha(220);
+    final centerPaint = Paint()..color = centerColor;
+
+    // 5 petals using precomputed trig
+    for (int i = 0; i < 5; i++) {
+      final petalCx = cx + r * 1.4 * _cos5(i);
+      final petalCy = cy + r * 1.4 * _sin5(i);
+      canvas.drawCircle(Offset(petalCx, petalCy), r, petalPaint);
+    }
+
+    // Centre
+    canvas.drawCircle(Offset(cx, cy), r * 0.70, centerPaint);
+  }
+
+  // Simple cos/sin for 5-petal flower — no math.dart import needed.
+  double _cos5(int i) {
+    // Precomputed cos values for angles 0, 72, 144, 216, 288 degrees
+    const vals = [0.0, 0.309, -0.809, -0.809, 0.309];
+    return vals[i % 5];
+  }
+
+  double _sin5(int i) {
+    // Precomputed sin values for angles 0, 72, 144, 216, 288 degrees
+    const vals = [-1.0, 0.951, 0.588, -0.588, -0.951];
+    return vals[i % 5];
   }
 
   @override
@@ -328,7 +605,7 @@ class _PositionedBuilding extends StatelessWidget {
                 ),
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
