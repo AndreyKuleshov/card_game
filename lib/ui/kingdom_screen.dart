@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/kingdom.dart';
 import '../models/save_state.dart';
 import '../state/providers.dart';
+import 'art.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -13,12 +14,6 @@ class KingdomScreen extends ConsumerWidget {
     BuildingType.barracks: 'Казарма',
     BuildingType.wall: 'Стена',
     BuildingType.mine: 'Шахта',
-  };
-
-  static const _icons = {
-    BuildingType.barracks: '🏹',
-    BuildingType.wall: '🧱',
-    BuildingType.mine: '⛏️',
   };
 
   String _effect(BuildingType type, Kingdom k) {
@@ -58,11 +53,16 @@ class KingdomScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: CastlePainterView(size: 80),
+              ),
+            ),
             for (final type in BuildingType.values)
               _BuildingCard(
                 type: type,
                 title: _titles[type]!,
-                icon: _icons[type]!,
                 level: k.levelOf(type),
                 effect: _effect(type, k),
                 crystals: save.crystals,
@@ -80,7 +80,6 @@ class KingdomScreen extends ConsumerWidget {
 class _BuildingCard extends StatelessWidget {
   final BuildingType type;
   final String title;
-  final String icon;
   final int level;
   final String effect;
   final int crystals;
@@ -89,7 +88,6 @@ class _BuildingCard extends StatelessWidget {
   const _BuildingCard({
     required this.type,
     required this.title,
-    required this.icon,
     required this.level,
     required this.effect,
     required this.crystals,
@@ -109,7 +107,7 @@ class _BuildingCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Text(icon, style: const TextStyle(fontSize: 36)),
+              BuildingArt(type: type, level: level, size: 56),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
