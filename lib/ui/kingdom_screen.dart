@@ -22,6 +22,7 @@ class KingdomScreen extends ConsumerWidget {
   };
 
   String _effect(BuildingType type, Kingdom k) {
+    if (k.levelOf(type) == 0) return 'Не построено';
     switch (type) {
       case BuildingType.barracks:
         return '+${k.barracksBonus} к силе карт стихии';
@@ -140,7 +141,7 @@ class _BuildingCard extends StatelessWidget {
                   : FilledButton(
                       onPressed: canAfford ? onUpgrade : null,
                       child: Text(
-                        'Улучшить\n($cost💎)',
+                        '${level == 0 ? 'Построить' : 'Улучшить'}\n($cost💎)',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 12),
                       ),

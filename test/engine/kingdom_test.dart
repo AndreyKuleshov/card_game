@@ -3,12 +3,26 @@ import 'package:card_game/engine/element.dart';
 import 'package:card_game/engine/kingdom.dart';
 
 void main() {
-  test('default kingdom is all level 1 with fire barracks', () {
+  test('default kingdom is all unbuilt (level 0) with fire barracks', () {
     const k = Kingdom();
-    expect(k.barracksLevel, 1);
-    expect(k.wallLevel, 1);
-    expect(k.mineLevel, 1);
+    expect(k.barracksLevel, 0);
+    expect(k.wallLevel, 0);
+    expect(k.mineLevel, 0);
     expect(k.barracksElement, Element.fire);
+  });
+
+  test('unbuilt buildings give no bonus', () {
+    const k = Kingdom();
+    expect(k.barracksBonus, 0);
+    expect(k.wallHpBonus, 0);
+    expect(k.mineCrystalsPerWin, 0);
+  });
+
+  test('building from level 0 costs 5; default config has no bonuses', () {
+    expect(KingdomEconomy.upgradeCost(BuildingType.wall, 0), 5);
+    final cfg = KingdomEconomy.toDuelConfig(const Kingdom());
+    expect(cfg.startingCastleHp, 30); // 30 base + 0 wall
+    expect(cfg.barracksBonus, 0);
   });
 
   test('building effects scale with level', () {

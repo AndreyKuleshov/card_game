@@ -33,6 +33,7 @@ void main() {
     // Force barracks to level 3 with plenty of crystals.
     final ctrl = container.read(saveStateProvider.notifier);
     ctrl.addCrystals(100);
+    ctrl.tryUpgrade(BuildingType.barracks); // 0->1
     ctrl.tryUpgrade(BuildingType.barracks); // 1->2
     ctrl.tryUpgrade(BuildingType.barracks); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(
@@ -47,8 +48,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer();
     final ctrl = container.read(saveStateProvider.notifier);
-    // Need enough crystals for two barracks upgrades (10+20) and the craft (40).
+    // Need enough crystals to build barracks 0->3 (5+10+25) and craft (40).
     ctrl.addCrystals(200);
+    ctrl.tryUpgrade(BuildingType.barracks); // 0->1
     ctrl.tryUpgrade(BuildingType.barracks); // 1->2
     ctrl.tryUpgrade(BuildingType.barracks); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(

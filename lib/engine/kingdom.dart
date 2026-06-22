@@ -10,15 +10,15 @@ class Kingdom {
   final Element barracksElement;
 
   const Kingdom({
-    this.barracksLevel = 1,
-    this.wallLevel = 1,
-    this.mineLevel = 1,
+    this.barracksLevel = 0,
+    this.wallLevel = 0,
+    this.mineLevel = 0,
     this.barracksElement = Element.fire,
   });
 
-  int get barracksBonus => barracksLevel; // 1/2/3
-  int get wallHpBonus => wallLevel * 5; // 5/10/15
-  int get mineCrystalsPerWin => mineLevel * 2; // 2/4/6
+  int get barracksBonus => barracksLevel; // 0/1/2/3 (level 0 = not built)
+  int get wallHpBonus => wallLevel * 5; // 0/5/10/15
+  int get mineCrystalsPerWin => mineLevel * 2; // 0/2/4/6
 
   int levelOf(BuildingType type) {
     switch (type) {
@@ -61,9 +61,12 @@ class Kingdom {
 class KingdomEconomy {
   const KingdomEconomy._();
 
-  /// Crystal cost to upgrade *from* [currentLevel]. Level 3 is the cap.
+  /// Crystal cost to build/upgrade *from* [currentLevel]. Level 0 = not built
+  /// yet (build cost); level 3 is the cap (cost 0).
   static int upgradeCost(BuildingType type, int currentLevel) {
     switch (currentLevel) {
+      case 0:
+        return 5;
       case 1:
         return 10;
       case 2:
