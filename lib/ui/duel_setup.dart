@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../engine/ability.dart';
 import '../engine/ai_controller.dart';
 import '../engine/deck.dart';
 import '../engine/duel_engine.dart';
@@ -68,10 +69,14 @@ List<GameCard> padToDeck(List<GameCard> cards) {
   return deck;
 }
 
-/// Builds a 12-card deck from the player's owned cards.
+/// Builds a 12-card deck from the player's owned cards. Trumps are placed first
+/// so owned козыри are always included (they live at the end of cards.json and
+/// would otherwise be cut off when padding to the deck size).
 List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
   final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
-  return padToDeck(owned);
+  final trumps = owned.where((c) => c.rarity == Rarity.trump).toList();
+  final others = owned.where((c) => c.rarity != Rarity.trump).toList();
+  return padToDeck([...trumps, ...others]);
 }
 
 class DuelReward {
