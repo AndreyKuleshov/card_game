@@ -23,12 +23,16 @@ class RoundResult {
   final int damage;
   final int playerEffectivePower;
   final int opponentEffectivePower;
+  final GameCard playerCard;
+  final GameCard opponentCard;
 
   const RoundResult({
     required this.winner,
     required this.damage,
     required this.playerEffectivePower,
     required this.opponentEffectivePower,
+    required this.playerCard,
+    required this.opponentCard,
   });
 }
 
@@ -69,7 +73,9 @@ class DuelEngine {
           winner: RoundWinner.tie,
           damage: 0,
           playerEffectivePower: pPow,
-          opponentEffectivePower: oPow);
+          opponentEffectivePower: oPow,
+          playerCard: playerCard,
+          opponentCard: opponentCard);
     }
 
     final playerWins = pPow > oPow;
@@ -89,6 +95,8 @@ class DuelEngine {
       damage: damage,
       playerEffectivePower: pPow,
       opponentEffectivePower: oPow,
+      playerCard: playerCard,
+      opponentCard: opponentCard,
     );
   }
 }
