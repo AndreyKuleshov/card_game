@@ -38,6 +38,8 @@ class DuelSession {
     _opponentDeck.shuffle(random);
     playerCastleHp = playerConfig.startingCastleHp;
     opponentCastleHp = opponentConfig.startingCastleHp;
+    _playerHand.clear();
+    _opponentHand.clear();
     _refill();
   }
 
@@ -52,21 +54,17 @@ class DuelSession {
     final oppCard = ai.chooseCard(hand: _opponentHand, config: opponentConfig);
     _opponentHand.remove(oppCard);
 
-    // Resolve from each side's perspective so both configs apply their own
-    // barracks bonus. Damage attribution uses the player-perspective winner.
-    final playerView = DuelEngine.resolveRound(
+    // Single authoritative resolution from the player's perspective so the
+    // returned RoundResult and the castle-damage attribution never disagree.
+    final result = DuelEngine.resolveRound(
         playerCard: card, opponentCard: oppCard, config: playerConfig);
-    final oppView = DuelEngine.resolveRound(
-        playerCard: oppCard, opponentCard: card, config: opponentConfig);
-
-    if (playerView.winner == RoundWinner.player) {
-      opponentCastleHp -= playerView.damage;
-    } else if (oppView.winner == RoundWinner.player) {
-      // opponent's own perspective: their card won
-      playerCastleHp -= oppView.damage;
+    if (result.winner == RoundWinner.player) {
+      opponentCastleHp -= result.damage;
+    } else if (result.winner == RoundWinner.opponent) {
+      playerCastleHp -= result.damage;
     }
     _refill();
-    return playerView;
+    return result;
   }
 
   DuelOutcome get outcome {

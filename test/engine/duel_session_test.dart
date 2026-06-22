@@ -56,4 +56,14 @@ void main() {
     }
     expect(s.outcome, DuelOutcome.playerWon);
   });
+
+  test('opponent winning a round damages the player castle', () {
+    final s = makeSession(
+      player: [c('p1', Element.fire, 1), c('p2', Element.fire, 1), c('p3', Element.fire, 1), c('p4', Element.fire, 1)],
+      opp: [c('o1', Element.fire, 9), c('o2', Element.fire, 9), c('o3', Element.fire, 9), c('o4', Element.fire, 9)],
+    );
+    final result = s.playPlayerCard(s.playerHand.first);
+    expect(result.winner, RoundWinner.opponent);
+    expect(s.playerCastleHp, lessThan(10));
+  });
 }
