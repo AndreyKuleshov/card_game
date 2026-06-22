@@ -56,17 +56,22 @@ const kSliceNodes = <MapNode>[
   ),
 ];
 
-/// Builds a 12-card deck from owned cards, padding by repeating owned ids so a
-/// thin starter collection still fills a deck.
-List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
-  final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
+/// Repeats [cards] (in order) until the deck holds [kDeckSize] cards, so a thin
+/// card list still fills a full deck. Returns empty if [cards] is empty.
+List<GameCard> padToDeck(List<GameCard> cards) {
   final deck = <GameCard>[];
   var i = 0;
-  while (deck.length < kDeckSize && owned.isNotEmpty) {
-    deck.add(owned[i % owned.length]);
+  while (deck.length < kDeckSize && cards.isNotEmpty) {
+    deck.add(cards[i % cards.length]);
     i++;
   }
   return deck;
+}
+
+/// Builds a 12-card deck from the player's owned cards.
+List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
+  final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
+  return padToDeck(owned);
 }
 
 class DuelReward {
@@ -113,7 +118,10 @@ DuelSession buildSession({
 }) {
   final byId = {for (final c in allCards) c.id: c};
   final playerCards = buildPlayerDeck(save, allCards);
-  final oppCards = node.opponentCardIds.map((id) => byId[id]!).toList();
+  // Pad the opponent's themed card list up to a full deck so duels last as long
+  // as the player's (they no longer run out after a few rounds).
+  final oppCards =
+      padToDeck(node.opponentCardIds.map((id) => byId[id]!).toList());
   return DuelSession(
     playerDeck: Deck(playerCards),
     opponentDeck: Deck(oppCards),

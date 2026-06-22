@@ -208,7 +208,12 @@ class _BattleZone extends StatelessWidget {
     // is a genuine element advantage — same-element matchups have none.
     final pEmoji = GameColors.elementEmoji(r.playerCard.element);
     final oEmoji = GameColors.elementEmoji(r.opponentCard.element);
-    final power = 'сила ${r.playerEffectivePower} : ${r.opponentEffectivePower}';
+    // Show base+bonus=effective so the jump from the card's printed power to its
+    // battle power (element advantage + Казарма) is obvious.
+    String side(int base, int eff) =>
+        eff > base ? '$base+${eff - base}=$eff' : '$eff';
+    final power = 'сила ${side(r.playerCard.power, r.playerEffectivePower)}'
+        ' : ${side(r.opponentCard.power, r.opponentEffectivePower)}';
     final String elementHint;
     if (isTie) {
       elementHint = '$power — ничья';
