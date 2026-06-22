@@ -1,0 +1,2070 @@
+# Commits on branch feature/vertical-slice
+7259eef chore: scaffold flutter project with riverpod and shared_preferences
+e0877f7 chore: gitignore build artifacts and IDE files
+558ba59 chore: untrack android iml file
+49c6ac5 feat: add element model and advantage rules
+878c98a feat: add ability, rarity, and GameCard models
+8299f4b feat: add deck with deterministic shuffle and draw
+dcd5101 feat: add duel round resolution with elements and abilities
+2a27d54 test: cover symmetric elementalShift, opponent doubleStrike, winner shield
+f69628e feat: add player controller interface and heuristic AI
+4ebffd7 feat: add kingdom buildings, upgrades, and economy
+993234f feat: add card json asset and repository parser
+28ebaee feat: add save state model and shared_preferences persistence
+e07b85b feat: add full-match duel session orchestration
+48e28e2 fix: single-resolution duel damage attribution; idempotent start; opponent-wins test
+fa0a147 feat: add riverpod providers and app shell (Task 11)
+24ba2ec feat: add world map screen and duel setup (Task 12)
+3da946b feat: add kingdom screen with building upgrades and trump crafting (Tasks 13+13b)
+669ea65 feat: add duel screen and post-duel reward flow (Task 14)
+693f156 refactor: extract testable duel reward logic; add reward + craft-guard tests
+4976d67 chore: clean analyzer by opting out of prefer_initializing_formals
+
+# Stat (our code only)
+ analysis_options.yaml               |  31 +++++++++
+ assets/cards.json                   |  18 +++++
+ lib/data/card_repository.dart       |  36 ++++++++++
+ lib/engine/ability.dart             |  14 ++++
+ lib/engine/ai_controller.dart       |  19 ++++++
+ lib/engine/deck.dart                |  25 +++++++
+ lib/engine/duel_engine.dart         |  94 ++++++++++++++++++++++++++
+ lib/engine/duel_session.dart        |  84 +++++++++++++++++++++++
+ lib/engine/element.dart             |  21 ++++++
+ lib/engine/game_card.dart           |  29 ++++++++
+ lib/engine/kingdom.dart             |  83 +++++++++++++++++++++++
+ lib/engine/player_controller.dart   |  24 +++++++
+ lib/main.dart                       |  11 ++++
+ lib/models/save_state.dart          |  71 ++++++++++++++++++++
+ lib/models/save_store.dart          |  19 ++++++
+ lib/state/providers.dart            |  56 ++++++++++++++++
+ lib/ui/app.dart                     |  15 +++++
+ lib/ui/duel_screen.dart             | 128 ++++++++++++++++++++++++++++++++++++
+ lib/ui/duel_setup.dart              | 122 ++++++++++++++++++++++++++++++++++
+ lib/ui/kingdom_screen.dart          |  94 ++++++++++++++++++++++++++
+ lib/ui/reward_screen.dart           |  43 ++++++++++++
+ lib/ui/world_map_screen.dart        |  54 +++++++++++++++
+ pubspec.yaml                        |  90 +++++++++++++++++++++++++
+ test/data/card_repository_test.dart |  42 ++++++++++++
+ test/engine/ai_controller_test.dart |  23 +++++++
+ test/engine/deck_test.dart          |  37 +++++++++++
+ test/engine/duel_engine_test.dart   | 123 ++++++++++++++++++++++++++++++++++
+ test/engine/duel_session_test.dart  |  69 +++++++++++++++++++
+ test/engine/element_test.dart       |  28 ++++++++
+ test/engine/game_card_test.dart     |  38 +++++++++++
+ test/engine/kingdom_test.dart       |  41 ++++++++++++
+ test/models/save_state_test.dart    |  49 ++++++++++++++
+ test/setup_smoke_test.dart          |   7 ++
+ test/ui/app_smoke_test.dart         |  13 ++++
+ test/ui/duel_reward_test.dart       |  45 +++++++++++++
+ test/ui/duel_screen_test.dart       |  19 ++++++
+ test/ui/kingdom_screen_test.dart    |  45 +++++++++++++
+ test/ui/world_map_test.dart         |  18 +++++
+ 38 files changed, 1778 insertions(+)
+
+# Full diff (our code only)
+diff --git a/analysis_options.yaml b/analysis_options.yaml
+new file mode 100644
+index 0000000..104f300
+--- /dev/null
++++ b/analysis_options.yaml
+@@ -0,0 +1,31 @@
++# This file configures the analyzer, which statically analyzes Dart code to
++# check for errors, warnings, and lints.
++#
++# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
++# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
++# invoked from the command line by running `flutter analyze`.
++
++# The following line activates a set of recommended lints for Flutter apps,
++# packages, and plugins designed to encourage good coding practices.
++include: package:flutter_lints/flutter.yaml
++
++linter:
++  # The lint rules applied to this project can be customized in the
++  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
++  # included above or to enable additional rules. A list of all available lints
++  # and their documentation is published at https://dart.dev/lints.
++  #
++  # Instead of disabling a lint rule for the entire project in the
++  # section below, it can also be suppressed for a single line of code
++  # or a specific dart file by using the `// ignore: name_of_lint` and
++  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
++  # producing the lint.
++  rules:
++    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
++    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
++    # DuelSession intentionally keeps private backing fields (_playerDeck/_opponentDeck)
++    # initialized from public-named params, so we opt out of this stylistic lint.
++    prefer_initializing_formals: false
++
++# Additional information about this file can be found at
++# https://dart.dev/guides/language/analysis-options
+diff --git a/assets/cards.json b/assets/cards.json
+new file mode 100644
+index 0000000..5372259
+--- /dev/null
++++ b/assets/cards.json
+@@ -0,0 +1,18 @@
++[
++  {"id":"fire_deer","name":"Горячий Олень","element":"fire","power":4,"rarity":"common","ability":null},
++  {"id":"fire_rooster","name":"Желанный Петушок","element":"fire","power":6,"rarity":"common","ability":null},
++  {"id":"fire_pie","name":"Горелый Пирожок","element":"fire","power":3,"rarity":"common","ability":null},
++  {"id":"fire_phoenix_pearl","name":"Перл Феникса","element":"fire","power":7,"rarity":"common","ability":null},
++  {"id":"nature_zucchini","name":"Боевой Кабачок","element":"nature","power":5,"rarity":"common","ability":null},
++  {"id":"nature_forester","name":"Пьяный Лесник","element":"nature","power":4,"rarity":"common","ability":null},
++  {"id":"nature_mushroom","name":"Гриб-Качок","element":"nature","power":6,"rarity":"common","ability":null},
++  {"id":"nature_hedgehog","name":"Боевой Ёж","element":"nature","power":3,"rarity":"common","ability":null},
++  {"id":"water_jellyfish","name":"Сердитая Медуза","element":"water","power":5,"rarity":"common","ability":null},
++  {"id":"water_puddle","name":"Капитан Лужа","element":"water","power":4,"rarity":"common","ability":null},
++  {"id":"water_beaver","name":"Бобёр-Сантехник","element":"water","power":6,"rarity":"common","ability":null},
++  {"id":"water_dumpling","name":"Ледяной Пельмень","element":"water","power":7,"rarity":"common","ability":null},
++  {"id":"trump_pumpkin_king","name":"Король-Тыква","element":"nature","power":9,"rarity":"trump","ability":"doubleStrike"},
++  {"id":"trump_lava_cat","name":"Лавовый Котик","element":"fire","power":8,"rarity":"trump","ability":"elementalShift"},
++  {"id":"trump_frost_granny","name":"Морозная Бабуля","element":"water","power":9,"rarity":"trump","ability":"shield"},
++  {"id":"trump_starter_drake","name":"Дракоша-Стартер","element":"fire","power":8,"rarity":"trump","ability":"doubleStrike"}
++]
+diff --git a/lib/data/card_repository.dart b/lib/data/card_repository.dart
+new file mode 100644
+index 0000000..ff9fdf1
+--- /dev/null
++++ b/lib/data/card_repository.dart
+@@ -0,0 +1,36 @@
++import 'dart:convert';
++import 'package:flutter/services.dart' show AssetBundle, rootBundle;
++import '../engine/ability.dart';
++import '../engine/element.dart';
++import '../engine/game_card.dart';
++
++class CardRepository {
++  const CardRepository._();
++
++  static Element _element(String s) => Element.values.firstWhere((e) => e.name == s);
++  static Rarity _rarity(String s) => Rarity.values.firstWhere((e) => e.name == s);
++  static Ability? _ability(String? s) =>
++      s == null ? null : Ability.values.firstWhere((e) => e.name == s);
++
++  static GameCard fromJson(Map<String, dynamic> json) {
++    return GameCard(
++      id: json['id'] as String,
++      name: json['name'] as String,
++      element: _element(json['element'] as String),
++      power: json['power'] as int,
++      rarity: _rarity(json['rarity'] as String),
++      ability: _ability(json['ability'] as String?),
++    );
++  }
++
++  static List<GameCard> parseAll(String jsonString) {
++    final list = jsonDecode(jsonString) as List<dynamic>;
++    return list.map((e) => fromJson(e as Map<String, dynamic>)).toList();
++  }
++
++  static Future<List<GameCard>> loadFromAsset(
++      {AssetBundle? bundle, String path = 'assets/cards.json'}) async {
++    final b = bundle ?? rootBundle;
++    return parseAll(await b.loadString(path));
++  }
++}
+diff --git a/lib/engine/ability.dart b/lib/engine/ability.dart
+new file mode 100644
+index 0000000..ee3f4f0
+--- /dev/null
++++ b/lib/engine/ability.dart
+@@ -0,0 +1,14 @@
++/// Trump-card abilities used in the vertical slice.
++enum Ability {
++  /// Ignore the opponent's element bonus this round.
++  elementalShift,
++
++  /// Deal x1.5 damage (floored) on a won round.
++  doubleStrike,
++
++  /// Take no castle damage on a lost round.
++  shield,
++}
++
++/// Card rarity tiers.
++enum Rarity { common, rare, trump }
+diff --git a/lib/engine/ai_controller.dart b/lib/engine/ai_controller.dart
+new file mode 100644
+index 0000000..b0fb1ba
+--- /dev/null
++++ b/lib/engine/ai_controller.dart
+@@ -0,0 +1,19 @@
++import 'duel_engine.dart';
++import 'game_card.dart';
++import 'player_controller.dart';
++
++class AiController extends PlayerController {
++  @override
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  }) {
++    final sorted = List<GameCard>.of(hand)
++      ..sort((a, b) {
++        final byPower = b.power.compareTo(a.power);
++        return byPower != 0 ? byPower : a.id.compareTo(b.id);
++      });
++    return sorted.first;
++  }
++}
+diff --git a/lib/engine/deck.dart b/lib/engine/deck.dart
+new file mode 100644
+index 0000000..240d656
+--- /dev/null
++++ b/lib/engine/deck.dart
+@@ -0,0 +1,25 @@
++import 'dart:math';
++import 'game_card.dart';
++
++class Deck {
++  final List<GameCard> _cards;
++
++  Deck(List<GameCard> cards) : _cards = List.of(cards);
++
++  int get remaining => _cards.length;
++  bool get isEmpty => _cards.isEmpty;
++
++  GameCard? draw() => _cards.isEmpty ? null : _cards.removeAt(0);
++
++  List<GameCard> drawUpTo(int n) {
++    final out = <GameCard>[];
++    for (var i = 0; i < n; i++) {
++      final card = draw();
++      if (card == null) break;
++      out.add(card);
++    }
++    return out;
++  }
++
++  void shuffle(Random random) => _cards.shuffle(random);
++}
+diff --git a/lib/engine/duel_engine.dart b/lib/engine/duel_engine.dart
+new file mode 100644
+index 0000000..5e6db3a
+--- /dev/null
++++ b/lib/engine/duel_engine.dart
+@@ -0,0 +1,94 @@
++import 'ability.dart';
++import 'element.dart';
++import 'game_card.dart';
++
++class DuelConfig {
++  final int startingCastleHp;
++  final int handSize;
++  final Element? barracksElement;
++  final int barracksBonus;
++
++  const DuelConfig({
++    this.startingCastleHp = 30,
++    this.handSize = 4,
++    this.barracksElement,
++    this.barracksBonus = 0,
++  });
++}
++
++enum RoundWinner { player, opponent, tie }
++
++class RoundResult {
++  final RoundWinner winner;
++  final int damage;
++  final int playerEffectivePower;
++  final int opponentEffectivePower;
++
++  const RoundResult({
++    required this.winner,
++    required this.damage,
++    required this.playerEffectivePower,
++    required this.opponentEffectivePower,
++  });
++}
++
++class DuelEngine {
++  const DuelEngine._();
++
++  static int effectivePower({
++    required GameCard card,
++    required GameCard opponentCard,
++    required bool isPlayer,
++    required DuelConfig config,
++  }) {
++    var power = card.power;
++    final opponentShifts = opponentCard.ability == Ability.elementalShift;
++    if (!opponentShifts && ElementRules.beats(card.element, opponentCard.element)) {
++      power += kElementBonus;
++    }
++    if (isPlayer &&
++        config.barracksElement != null &&
++        card.element == config.barracksElement) {
++      power += config.barracksBonus;
++    }
++    return power;
++  }
++
++  static RoundResult resolveRound({
++    required GameCard playerCard,
++    required GameCard opponentCard,
++    required DuelConfig config,
++  }) {
++    final pPow = effectivePower(
++        card: playerCard, opponentCard: opponentCard, isPlayer: true, config: config);
++    final oPow = effectivePower(
++        card: opponentCard, opponentCard: playerCard, isPlayer: false, config: config);
++
++    if (pPow == oPow) {
++      return RoundResult(
++          winner: RoundWinner.tie,
++          damage: 0,
++          playerEffectivePower: pPow,
++          opponentEffectivePower: oPow);
++    }
++
++    final playerWins = pPow > oPow;
++    final winningCard = playerWins ? playerCard : opponentCard;
++    final losingCard = playerWins ? opponentCard : playerCard;
++
++    var damage = (pPow - oPow).abs();
++    if (winningCard.ability == Ability.doubleStrike) {
++      damage = (damage * 1.5).floor();
++    }
++    if (losingCard.ability == Ability.shield) {
++      damage = 0;
++    }
++
++    return RoundResult(
++      winner: playerWins ? RoundWinner.player : RoundWinner.opponent,
++      damage: damage,
++      playerEffectivePower: pPow,
++      opponentEffectivePower: oPow,
++    );
++  }
++}
+diff --git a/lib/engine/duel_session.dart b/lib/engine/duel_session.dart
+new file mode 100644
+index 0000000..d51b20e
+--- /dev/null
++++ b/lib/engine/duel_session.dart
+@@ -0,0 +1,84 @@
++import 'dart:math';
++import 'ai_controller.dart';
++import 'deck.dart';
++import 'duel_engine.dart';
++import 'game_card.dart';
++
++enum DuelOutcome { playerWon, opponentWon, ongoing }
++
++class DuelSession {
++  final Deck _playerDeck;
++  final Deck _opponentDeck;
++  final DuelConfig playerConfig;
++  final DuelConfig opponentConfig;
++  final AiController ai;
++  final Random random;
++
++  final List<GameCard> _playerHand = [];
++  final List<GameCard> _opponentHand = [];
++
++  late int playerCastleHp;
++  late int opponentCastleHp;
++
++  DuelSession({
++    required Deck playerDeck,
++    required Deck opponentDeck,
++    required this.playerConfig,
++    required this.opponentConfig,
++    required this.ai,
++    required this.random,
++  })  : _playerDeck = playerDeck,
++        _opponentDeck = opponentDeck;
++
++  List<GameCard> get playerHand => List.unmodifiable(_playerHand);
++  List<GameCard> get opponentHand => List.unmodifiable(_opponentHand);
++
++  void start() {
++    _playerDeck.shuffle(random);
++    _opponentDeck.shuffle(random);
++    playerCastleHp = playerConfig.startingCastleHp;
++    opponentCastleHp = opponentConfig.startingCastleHp;
++    _playerHand.clear();
++    _opponentHand.clear();
++    _refill();
++  }
++
++  void _refill() {
++    _playerHand.addAll(_playerDeck.drawUpTo(playerConfig.handSize - _playerHand.length));
++    _opponentHand
++        .addAll(_opponentDeck.drawUpTo(opponentConfig.handSize - _opponentHand.length));
++  }
++
++  RoundResult playPlayerCard(GameCard card) {
++    _playerHand.remove(card);
++    final oppCard = ai.chooseCard(hand: _opponentHand, config: opponentConfig);
++    _opponentHand.remove(oppCard);
++
++    // Single authoritative resolution from the player's perspective so the
++    // returned RoundResult and the castle-damage attribution never disagree.
++    final result = DuelEngine.resolveRound(
++        playerCard: card, opponentCard: oppCard, config: playerConfig);
++    if (result.winner == RoundWinner.player) {
++      opponentCastleHp -= result.damage;
++    } else if (result.winner == RoundWinner.opponent) {
++      playerCastleHp -= result.damage;
++    }
++    _refill();
++    return result;
++  }
++
++  DuelOutcome get outcome {
++    if (opponentCastleHp <= 0) return DuelOutcome.playerWon;
++    if (playerCastleHp <= 0) return DuelOutcome.opponentWon;
++    final exhausted = _playerHand.isEmpty &&
++        _opponentHand.isEmpty &&
++        _playerDeck.isEmpty &&
++        _opponentDeck.isEmpty;
++    if (exhausted) {
++      return playerCastleHp >= opponentCastleHp
++          ? DuelOutcome.playerWon
++          : DuelOutcome.opponentWon;
++    }
++    return DuelOutcome.ongoing;
++  }
++}
+diff --git a/lib/engine/element.dart b/lib/engine/element.dart
+new file mode 100644
+index 0000000..9de9867
+--- /dev/null
++++ b/lib/engine/element.dart
+@@ -0,0 +1,21 @@
++/// The three fantasy elements. Cycle: fire -> nature -> water -> fire.
++enum Element { fire, nature, water }
++
++/// Bonus added to effective power when a card has elemental advantage.
++const int kElementBonus = 3;
++
++class ElementRules {
++  const ElementRules._();
++
++  /// Returns true if [a] has elemental advantage over [b].
++  static bool beats(Element a, Element b) {
++    switch (a) {
++      case Element.fire:
++        return b == Element.nature;
++      case Element.nature:
++        return b == Element.water;
++      case Element.water:
++        return b == Element.fire;
++    }
++  }
++}
+diff --git a/lib/engine/game_card.dart b/lib/engine/game_card.dart
+new file mode 100644
+index 0000000..4cd85ce
+--- /dev/null
++++ b/lib/engine/game_card.dart
+@@ -0,0 +1,29 @@
++import 'ability.dart';
++import 'element.dart';
++
++class GameCard {
++  final String id;
++  final String name;
++  final Element element;
++  final int power;
++  final Rarity rarity;
++  final Ability? ability;
++
++  const GameCard({
++    required this.id,
++    required this.name,
++    required this.element,
++    required this.power,
++    required this.rarity,
++    this.ability,
++  });
++
++  @override
++  bool operator ==(Object other) => other is GameCard && other.id == id;
++
++  @override
++  int get hashCode => id.hashCode;
++
++  @override
++  String toString() => 'GameCard($id, $name, $element, p$power)';
++}
+diff --git a/lib/engine/kingdom.dart b/lib/engine/kingdom.dart
+new file mode 100644
+index 0000000..374a702
+--- /dev/null
++++ b/lib/engine/kingdom.dart
+@@ -0,0 +1,83 @@
++import 'duel_engine.dart';
++import 'element.dart';
++
++enum BuildingType { barracks, wall, mine }
++
++class Kingdom {
++  final int barracksLevel;
++  final int wallLevel;
++  final int mineLevel;
++  final Element barracksElement;
++
++  const Kingdom({
++    this.barracksLevel = 1,
++    this.wallLevel = 1,
++    this.mineLevel = 1,
++    this.barracksElement = Element.fire,
++  });
++
++  int get barracksBonus => barracksLevel; // 1/2/3
++  int get wallHpBonus => wallLevel * 5; // 5/10/15
++  int get mineCrystalsPerWin => mineLevel * 2; // 2/4/6
++
++  int levelOf(BuildingType type) {
++    switch (type) {
++      case BuildingType.barracks:
++        return barracksLevel;
++      case BuildingType.wall:
++        return wallLevel;
++      case BuildingType.mine:
++        return mineLevel;
++    }
++  }
++
++  Kingdom upgraded(BuildingType type) {
++    int cap(int level) => level >= 3 ? 3 : level + 1;
++    switch (type) {
++      case BuildingType.barracks:
++        return copyWith(barracksLevel: cap(barracksLevel));
++      case BuildingType.wall:
++        return copyWith(wallLevel: cap(wallLevel));
++      case BuildingType.mine:
++        return copyWith(mineLevel: cap(mineLevel));
++    }
++  }
++
++  Kingdom copyWith({
++    int? barracksLevel,
++    int? wallLevel,
++    int? mineLevel,
++    Element? barracksElement,
++  }) {
++    return Kingdom(
++      barracksLevel: barracksLevel ?? this.barracksLevel,
++      wallLevel: wallLevel ?? this.wallLevel,
++      mineLevel: mineLevel ?? this.mineLevel,
++      barracksElement: barracksElement ?? this.barracksElement,
++    );
++  }
++}
++
++class KingdomEconomy {
++  const KingdomEconomy._();
++
++  /// Crystal cost to upgrade *from* [currentLevel]. Level 3 is the cap.
++  static int upgradeCost(BuildingType type, int currentLevel) {
++    switch (currentLevel) {
++      case 1:
++        return 10;
++      case 2:
++        return 25;
++      default:
++        return 0; // already max
++    }
++  }
++
++  static DuelConfig toDuelConfig(Kingdom k) {
++    return DuelConfig(
++      startingCastleHp: 30 + k.wallHpBonus,
++      barracksElement: k.barracksElement,
++      barracksBonus: k.barracksBonus,
++    );
++  }
++}
+diff --git a/lib/engine/player_controller.dart b/lib/engine/player_controller.dart
+new file mode 100644
+index 0000000..47be978
+--- /dev/null
++++ b/lib/engine/player_controller.dart
+@@ -0,0 +1,24 @@
++import 'duel_engine.dart';
++import 'game_card.dart';
++
++abstract class PlayerController {
++  /// Choose a card to play this round from [hand].
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  });
++}
++
++/// Human moves arrive from the UI, not from this method. The class exists so
++/// the duel flow is symmetric and a RemoteController can slot in later.
++class HumanController extends PlayerController {
++  @override
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  }) {
++    throw UnimplementedError('Human moves are supplied by the UI layer.');
++  }
++}
+diff --git a/lib/main.dart b/lib/main.dart
+new file mode 100644
+index 0000000..18fedbf
+--- /dev/null
++++ b/lib/main.dart
+@@ -0,0 +1,11 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'state/providers.dart';
++import 'ui/app.dart';
++
++Future<void> main() async {
++  WidgetsFlutterBinding.ensureInitialized();
++  final container = ProviderContainer();
++  await container.read(saveStateProvider.notifier).hydrate();
++  runApp(UncontrolledProviderScope(container: container, child: const CardGameApp()));
++}
+diff --git a/lib/models/save_state.dart b/lib/models/save_state.dart
+new file mode 100644
+index 0000000..ce588a0
+--- /dev/null
++++ b/lib/models/save_state.dart
+@@ -0,0 +1,71 @@
++import '../engine/element.dart';
++import '../engine/kingdom.dart';
++
++const _starterCommonIds = [
++  'fire_deer', 'fire_rooster', 'fire_pie', 'fire_phoenix_pearl',
++  'nature_zucchini', 'nature_forester', 'nature_mushroom', 'nature_hedgehog',
++  'water_jellyfish', 'water_puddle', 'water_beaver', 'water_dumpling',
++];
++
++class SaveState {
++  final int crystals;
++  final Kingdom kingdom;
++  final Set<String> ownedCardIds;
++  final int unlockedNodeIndex;
++
++  const SaveState({
++    required this.crystals,
++    required this.kingdom,
++    required this.ownedCardIds,
++    required this.unlockedNodeIndex,
++  });
++
++  static SaveState initial() => SaveState(
++        crystals: 0,
++        kingdom: const Kingdom(),
++        ownedCardIds: {..._starterCommonIds, 'trump_starter_drake'},
++        unlockedNodeIndex: 0,
++      );
++
++  SaveState copyWith({
++    int? crystals,
++    Kingdom? kingdom,
++    Set<String>? ownedCardIds,
++    int? unlockedNodeIndex,
++  }) {
++    return SaveState(
++      crystals: crystals ?? this.crystals,
++      kingdom: kingdom ?? this.kingdom,
++      ownedCardIds: ownedCardIds ?? this.ownedCardIds,
++      unlockedNodeIndex: unlockedNodeIndex ?? this.unlockedNodeIndex,
++    );
++  }
++
++  Map<String, dynamic> toJson() => {
++        'crystals': crystals,
++        'kingdom': {
++          'barracksLevel': kingdom.barracksLevel,
++          'wallLevel': kingdom.wallLevel,
++          'mineLevel': kingdom.mineLevel,
++          'barracksElement': kingdom.barracksElement.name,
++        },
++        'ownedCardIds': ownedCardIds.toList(),
++        'unlockedNodeIndex': unlockedNodeIndex,
++      };
++
++  factory SaveState.fromJson(Map<String, dynamic> json) {
++    final k = json['kingdom'] as Map<String, dynamic>;
++    return SaveState(
++      crystals: json['crystals'] as int,
++      kingdom: Kingdom(
++        barracksLevel: k['barracksLevel'] as int,
++        wallLevel: k['wallLevel'] as int,
++        mineLevel: k['mineLevel'] as int,
++        barracksElement:
++            Element.values.firstWhere((e) => e.name == k['barracksElement']),
++      ),
++      ownedCardIds: (json['ownedCardIds'] as List<dynamic>).cast<String>().toSet(),
++      unlockedNodeIndex: json['unlockedNodeIndex'] as int,
++    );
++  }
++}
+diff --git a/lib/models/save_store.dart b/lib/models/save_store.dart
+new file mode 100644
+index 0000000..2ddc449
+--- /dev/null
++++ b/lib/models/save_store.dart
+@@ -0,0 +1,19 @@
++import 'dart:convert';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'save_state.dart';
++
++class SaveStore {
++  static const _key = 'save_v1';
++
++  Future<SaveState> load() async {
++    final prefs = await SharedPreferences.getInstance();
++    final raw = prefs.getString(_key);
++    if (raw == null) return SaveState.initial();
++    return SaveState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
++  }
++
++  Future<void> save(SaveState state) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setString(_key, jsonEncode(state.toJson()));
++  }
++}
+diff --git a/lib/state/providers.dart b/lib/state/providers.dart
+new file mode 100644
+index 0000000..779d400
+--- /dev/null
++++ b/lib/state/providers.dart
+@@ -0,0 +1,56 @@
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../data/card_repository.dart';
++import '../engine/game_card.dart';
++import '../engine/kingdom.dart';
++import '../models/save_state.dart';
++import '../models/save_store.dart';
++
++final saveStoreProvider = Provider<SaveStore>((ref) => SaveStore());
++
++final cardsProvider = FutureProvider<List<GameCard>>((ref) async {
++  return CardRepository.loadFromAsset();
++});
++
++final saveStateProvider =
++    NotifierProvider<SaveController, SaveState>(SaveController.new);
++
++class SaveController extends Notifier<SaveState> {
++  late final SaveStore _store;
++
++  @override
++  SaveState build() {
++    _store = ref.read(saveStoreProvider);
++    return SaveState.initial();
++  }
++
++  Future<void> hydrate() async {
++    state = await _store.load();
++  }
++
++  void _commit(SaveState next) {
++    state = next;
++    _store.save(next);
++  }
++
++  void addCrystals(int n) => _commit(state.copyWith(crystals: state.crystals + n));
++
++  bool tryUpgrade(BuildingType type) {
++    final level = state.kingdom.levelOf(type);
++    if (level >= 3) return false;
++    final cost = KingdomEconomy.upgradeCost(type, level);
++    if (state.crystals < cost) return false;
++    _commit(state.copyWith(
++      crystals: state.crystals - cost,
++      kingdom: state.kingdom.upgraded(type),
++    ));
++    return true;
++  }
++
++  void grantCard(String id) {
++    if (state.ownedCardIds.contains(id)) return;
++    _commit(state.copyWith(ownedCardIds: {...state.ownedCardIds, id}));
++  }
++
++  void unlockNextNode() =>
++      _commit(state.copyWith(unlockedNodeIndex: state.unlockedNodeIndex + 1));
++}
+diff --git a/lib/ui/app.dart b/lib/ui/app.dart
+new file mode 100644
+index 0000000..34fb628
+--- /dev/null
++++ b/lib/ui/app.dart
+@@ -0,0 +1,15 @@
++import 'package:flutter/material.dart';
++import 'world_map_screen.dart';
++
++class CardGameApp extends StatelessWidget {
++  const CardGameApp({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return MaterialApp(
++      title: 'Карточное Королевство',
++      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
++      home: const WorldMapScreen(),
++    );
++  }
++}
+diff --git a/lib/ui/duel_screen.dart b/lib/ui/duel_screen.dart
+new file mode 100644
+index 0000000..3bc1d67
+--- /dev/null
++++ b/lib/ui/duel_screen.dart
+@@ -0,0 +1,128 @@
++import 'dart:math';
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../engine/duel_session.dart';
++import '../engine/game_card.dart';
++import '../state/providers.dart';
++import 'duel_setup.dart';
++import 'reward_screen.dart';
++
++class DuelScreen extends ConsumerStatefulWidget {
++  final MapNode node;
++  const DuelScreen({super.key, required this.node});
++
++  @override
++  ConsumerState<DuelScreen> createState() => _DuelScreenState();
++}
++
++class _DuelScreenState extends ConsumerState<DuelScreen> {
++  DuelSession? _session;
++  String _log = 'Выбери карту';
++  bool _resolved = false;
++
++  @override
++  Widget build(BuildContext context) {
++    final cardsAsync = ref.watch(cardsProvider);
++    final save = ref.watch(saveStateProvider);
++
++    return cardsAsync.when(
++      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
++      error: (e, _) => Scaffold(body: Center(child: Text('Ошибка: $e'))),
++      data: (allCards) {
++        final session = _session ??= buildSession(
++          save: save,
++          allCards: allCards,
++          node: widget.node,
++          random: Random(widget.node.index + 1),
++        );
++        return Scaffold(
++          appBar: AppBar(title: Text(widget.node.title)),
++          body: Padding(
++            padding: const EdgeInsets.all(16),
++            child: Column(
++              children: [
++                Text('Замок врага: ${session.opponentCastleHp}'),
++                Text('Твой Замок: ${session.playerCastleHp}'),
++                const SizedBox(height: 12),
++                Text(_log),
++                const Spacer(),
++                Wrap(
++                  spacing: 8,
++                  runSpacing: 8,
++                  children: [
++                    for (final card in session.playerHand)
++                      Card(
++                        child: InkWell(
++                          onTap: _resolved ? null : () => _play(card, session),
++                          child: SizedBox(
++                            width: 80,
++                            height: 110,
++                            child: Padding(
++                              padding: const EdgeInsets.all(6),
++                              child: Column(
++                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                                children: [
++                                  Text(_elementEmoji(card),
++                                      style: const TextStyle(fontSize: 22)),
++                                  Flexible(
++                                    child: Text(card.name,
++                                        textAlign: TextAlign.center,
++                                        overflow: TextOverflow.ellipsis,
++                                        maxLines: 2,
++                                        style: const TextStyle(fontSize: 10)),
++                                  ),
++                                  Text('${card.power}',
++                                      style: const TextStyle(
++                                          fontSize: 18, fontWeight: FontWeight.bold)),
++                                ],
++                              ),
++                            ),
++                          ),
++                        ),
++                      ),
++                  ],
++                ),
++              ],
++            ),
++          ),
++        );
++      },
++    );
++  }
++
++  String _elementEmoji(GameCard c) =>
++      {'fire': '🔥', 'nature': '🌿', 'water': '💧'}[c.element.name] ?? '❔';
++
++  void _play(GameCard card, DuelSession session) {
++    final result = session.playPlayerCard(card);
++    setState(() {
++      _log = 'Раунд: ${result.playerEffectivePower} против '
++          '${result.opponentEffectivePower}, урон ${result.damage}';
++    });
++    final outcome = session.outcome;
++    if (outcome != DuelOutcome.ongoing && !_resolved) {
++      _resolved = true;
++      _finish(outcome == DuelOutcome.playerWon);
++    } else {
++      setState(() {}); // refresh hand
++    }
++  }
++
++  void _finish(bool won) {
++    final controller = ref.read(saveStateProvider.notifier);
++    final save = ref.read(saveStateProvider);
++    final reward = computeDuelReward(node: widget.node, save: save, won: won);
++    if (won) {
++      if (reward.crystalsEarned > 0) controller.addCrystals(reward.crystalsEarned);
++      if (reward.unlockNext) controller.unlockNextNode();
++      if (reward.trumpGranted != null) controller.grantCard(reward.trumpGranted!);
++    }
++    Navigator.of(context).pushReplacement(MaterialPageRoute(
++      builder: (_) => RewardScreen(
++        won: won,
++        crystalsEarned: reward.crystalsEarned,
++        trumpGranted: reward.trumpGranted,
++      ),
++    ));
++  }
++}
+diff --git a/lib/ui/duel_setup.dart b/lib/ui/duel_setup.dart
+new file mode 100644
+index 0000000..a3c9f87
+--- /dev/null
++++ b/lib/ui/duel_setup.dart
+@@ -0,0 +1,122 @@
++import 'dart:math';
++import '../engine/ai_controller.dart';
++import '../engine/deck.dart';
++import '../engine/duel_engine.dart';
++import '../engine/duel_session.dart';
++import '../engine/game_card.dart';
++import '../engine/kingdom.dart';
++import '../models/save_state.dart';
++
++const int kDeckSize = 12;
++
++class MapNode {
++  final int index;
++  final String title;
++  final List<String> opponentCardIds;
++  final DuelConfig opponentConfig;
++  final bool isBoss;
++  final String? rewardTrumpId;
++
++  const MapNode({
++    required this.index,
++    required this.title,
++    required this.opponentCardIds,
++    required this.opponentConfig,
++    this.isBoss = false,
++    this.rewardTrumpId,
++  });
++}
++
++const kSliceNodes = <MapNode>[
++  MapNode(
++    index: 0,
++    title: 'Тренировка',
++    opponentCardIds: ['fire_pie', 'nature_hedgehog', 'water_puddle', 'fire_deer'],
++    opponentConfig: DuelConfig(startingCastleHp: 20),
++  ),
++  MapNode(
++    index: 1,
++    title: 'Противник 1',
++    opponentCardIds: ['fire_rooster', 'nature_zucchini', 'water_jellyfish', 'nature_mushroom'],
++    opponentConfig: DuelConfig(startingCastleHp: 28),
++  ),
++  MapNode(
++    index: 2,
++    title: 'Противник 2',
++    opponentCardIds: ['water_beaver', 'fire_phoenix_pearl', 'nature_mushroom', 'water_dumpling'],
++    opponentConfig: DuelConfig(startingCastleHp: 34),
++  ),
++  MapNode(
++    index: 3,
++    title: 'БОСС: Тыквенный Лорд',
++    opponentCardIds: ['water_dumpling', 'fire_phoenix_pearl', 'water_beaver', 'trump_lava_cat'],
++    opponentConfig: DuelConfig(startingCastleHp: 40),
++    isBoss: true,
++    rewardTrumpId: 'trump_pumpkin_king',
++  ),
++];
++
++/// Builds a 12-card deck from owned cards, padding by repeating owned ids so a
++/// thin starter collection still fills a deck.
++List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
++  final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
++  final deck = <GameCard>[];
++  var i = 0;
++  while (deck.length < kDeckSize && owned.isNotEmpty) {
++    deck.add(owned[i % owned.length]);
++    i++;
++  }
++  return deck;
++}
++
++class DuelReward {
++  final int crystalsEarned;
++  final bool unlockNext;
++  final String? trumpGranted;
++  const DuelReward({
++    required this.crystalsEarned,
++    required this.unlockNext,
++    this.trumpGranted,
++  });
++}
++
++/// Pure, deterministic computation of what a finished duel grants.
++/// Mirrors the slice rules: crystals = 5 + mine bonus; unlock the next node
++/// only when this node is the current frontier and not the last; a boss grants
++/// its rewardTrumpId; a non-boss win rolls a seeded ~30% chest for a trump.
++DuelReward computeDuelReward({
++  required MapNode node,
++  required SaveState save,
++  required bool won,
++}) {
++  if (!won) return const DuelReward(crystalsEarned: 0, unlockNext: false);
++  final earned = 5 + save.kingdom.mineCrystalsPerWin;
++  final unlockNext =
++      node.index >= save.unlockedNodeIndex && node.index < kSliceNodes.length - 1;
++  String? trump;
++  if (node.rewardTrumpId != null) {
++    trump = node.rewardTrumpId;
++  } else if (Random(node.index + 7).nextDouble() < 0.30) {
++    trump = 'trump_frost_granny';
++  }
++  return DuelReward(crystalsEarned: earned, unlockNext: unlockNext, trumpGranted: trump);
++}
++
++DuelSession buildSession({
++  required SaveState save,
++  required List<GameCard> allCards,
++  required MapNode node,
++  required Random random,
++}) {
++  final byId = {for (final c in allCards) c.id: c};
++  final playerCards = buildPlayerDeck(save, allCards);
++  final oppCards = node.opponentCardIds.map((id) => byId[id]!).toList();
++  return DuelSession(
++    playerDeck: Deck(playerCards),
++    opponentDeck: Deck(oppCards),
++    playerConfig: KingdomEconomy.toDuelConfig(save.kingdom),
++    opponentConfig: node.opponentConfig,
++    ai: AiController(),
++    random: random,
++  )..start();
++}
+diff --git a/lib/ui/kingdom_screen.dart b/lib/ui/kingdom_screen.dart
+new file mode 100644
+index 0000000..3db7407
+--- /dev/null
++++ b/lib/ui/kingdom_screen.dart
+@@ -0,0 +1,94 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../engine/kingdom.dart';
++import '../state/providers.dart';
++
++class KingdomScreen extends ConsumerWidget {
++  const KingdomScreen({super.key});
++
++  static const _titles = {
++    BuildingType.barracks: 'Казарма',
++    BuildingType.wall: 'Стена',
++    BuildingType.mine: 'Шахта',
++  };
++
++  String _effect(BuildingType type, Kingdom k) {
++    switch (type) {
++      case BuildingType.barracks:
++        return '+${k.barracksBonus} к силе карт стихии';
++      case BuildingType.wall:
++        return '+${k.wallHpBonus} ХП замка';
++      case BuildingType.mine:
++        return '+${k.mineCrystalsPerWin} 💎 за победу';
++    }
++  }
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final save = ref.watch(saveStateProvider);
++    final controller = ref.read(saveStateProvider.notifier);
++    final k = save.kingdom;
++
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Королевство'),
++        actions: [
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('💎 ${save.crystals}')),
++          ),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          for (final type in BuildingType.values)
++            Card(
++              child: Column(
++                children: [
++                  ListTile(
++                    title: Text(_titles[type]!),
++                    subtitle: Text('Ур. ${k.levelOf(type)} — ${_effect(type, k)}'),
++                    trailing: k.levelOf(type) >= 3
++                        ? const Text('МАКС')
++                        : FilledButton(
++                            onPressed: save.crystals >=
++                                    KingdomEconomy.upgradeCost(type, k.levelOf(type))
++                                ? () => controller.tryUpgrade(type)
++                                : null,
++                            child: Text(
++                                'Улучшить (${KingdomEconomy.upgradeCost(type, k.levelOf(type))}💎)'),
++                          ),
++                  ),
++                  if (type == BuildingType.barracks && k.barracksLevel >= 3)
++                    Builder(builder: (context) {
++                      const craftId = 'trump_pumpkin_king';
++                      const altId = 'trump_frost_granny';
++                      final target = save.ownedCardIds.contains(craftId) ? altId : craftId;
++                      if (save.ownedCardIds.contains(target)) {
++                        return const Padding(
++                          padding: EdgeInsets.all(8),
++                          child: Text('Все козыри кузницы созданы'),
++                        );
++                      }
++                      return Padding(
++                        padding: const EdgeInsets.all(8),
++                        child: FilledButton.tonal(
++                          onPressed: save.crystals >= 40
++                              ? () {
++                                  controller.addCrystals(-40);
++                                  controller.grantCard(target);
++                                }
++                              : null,
++                          child: const Text('Создать козырь (40💎)'),
++                        ),
++                      );
++                    }),
++                ],
++              ),
++            ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/ui/reward_screen.dart b/lib/ui/reward_screen.dart
+new file mode 100644
+index 0000000..105ddc7
+--- /dev/null
++++ b/lib/ui/reward_screen.dart
+@@ -0,0 +1,43 @@
++import 'package:flutter/material.dart';
++
++class RewardScreen extends StatelessWidget {
++  final bool won;
++  final int crystalsEarned;
++  final String? trumpGranted;
++
++  const RewardScreen({
++    super.key,
++    required this.won,
++    required this.crystalsEarned,
++    this.trumpGranted,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: Text(won ? 'Победа!' : 'Поражение')),
++      body: Center(
++        child: Column(
++          mainAxisAlignment: MainAxisAlignment.center,
++          children: [
++            Text(won ? '🎉 Замок врага пал!' : '💥 Твой замок разрушен',
++                style: Theme.of(context).textTheme.headlineSmall),
++            const SizedBox(height: 16),
++            if (won) Text('Получено: 💎 $crystalsEarned'),
++            if (trumpGranted != null)
++              Padding(
++                padding: const EdgeInsets.only(top: 8),
++                child: Text('🏆 Новый козырь: $trumpGranted'),
++              ),
++            const SizedBox(height: 24),
++            FilledButton(
++              onPressed: () => Navigator.of(context)
++                  .popUntil((route) => route.isFirst),
++              child: const Text('В королевство'),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/ui/world_map_screen.dart b/lib/ui/world_map_screen.dart
+new file mode 100644
+index 0000000..b4b4743
+--- /dev/null
++++ b/lib/ui/world_map_screen.dart
+@@ -0,0 +1,54 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../state/providers.dart';
++import 'duel_setup.dart';
++import 'duel_screen.dart';
++import 'kingdom_screen.dart';
++
++class WorldMapScreen extends ConsumerWidget {
++  const WorldMapScreen({super.key});
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final save = ref.watch(saveStateProvider);
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Карта мира'),
++        actions: [
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('💎 ${save.crystals}')),
++          ),
++          IconButton(
++            icon: const Icon(Icons.castle),
++            tooltip: 'Королевство',
++            onPressed: () => Navigator.of(context).push(
++              MaterialPageRoute(builder: (_) => const KingdomScreen()),
++            ),
++          ),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          for (final node in kSliceNodes)
++            Card(
++              child: ListTile(
++                leading: Icon(node.isBoss ? Icons.whatshot : Icons.flag),
++                title: Text(node.title),
++                trailing: node.index <= save.unlockedNodeIndex
++                    ? const Icon(Icons.play_arrow)
++                    : const Icon(Icons.lock),
++                enabled: node.index <= save.unlockedNodeIndex,
++                onTap: node.index <= save.unlockedNodeIndex
++                    ? () => Navigator.of(context).push(
++                          MaterialPageRoute(builder: (_) => DuelScreen(node: node)),
++                        )
++                    : null,
++              ),
++            ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/pubspec.yaml b/pubspec.yaml
+new file mode 100644
+index 0000000..ffeef37
+--- /dev/null
++++ b/pubspec.yaml
+@@ -0,0 +1,90 @@
++name: card_game
++description: "A new Flutter project."
++# The following line prevents the package from being accidentally published to
++# pub.dev using `flutter pub publish`. This is preferred for private packages.
++publish_to: 'none' # Remove this line if you wish to publish to pub.dev
++
++# The following defines the version and build number for your application.
++# A version number is three numbers separated by dots, like 1.2.43
++# followed by an optional build number separated by a +.
++# Both the version and the builder number may be overridden in flutter
++# build by specifying --build-name and --build-number, respectively.
++# In Android, build-name is used as versionName while build-number used as versionCode.
++# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
++# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
++# Read more about iOS versioning at
++# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
++# In Windows, build-name is used as the major, minor, and patch parts
++# of the product and file versions while build-number is used as the build suffix.
++version: 1.0.0+1
++
++environment:
++  sdk: ^3.12.2
++
++# Dependencies specify other packages that your package needs in order to work.
++# To automatically upgrade your package dependencies to the latest versions
++# consider running `flutter pub upgrade --major-versions`. Alternatively,
++# dependencies can be manually updated by changing the version numbers below to
++# the latest version available on pub.dev. To see which dependencies have newer
++# versions available, run `flutter pub outdated`.
++dependencies:
++  flutter:
++    sdk: flutter
++
++  # The following adds the Cupertino Icons font to your application.
++  # Use with the CupertinoIcons class for iOS style icons.
++  cupertino_icons: ^1.0.8
++  flutter_riverpod: ^3.3.2
++  shared_preferences: ^2.5.5
++
++dev_dependencies:
++  flutter_test:
++    sdk: flutter
++
++  # The "flutter_lints" package below contains a set of recommended lints to
++  # encourage good coding practices. The lint set provided by the package is
++  # activated in the `analysis_options.yaml` file located at the root of your
++  # package. See that file for information about deactivating specific lint
++  # rules and activating additional ones.
++  flutter_lints: ^6.0.0
++
++# For information on the generic Dart part of this file, see the
++# following page: https://dart.dev/tools/pub/pubspec
++
++# The following section is specific to Flutter packages.
++flutter:
++
++  # The following line ensures that the Material Icons font is
++  # included with your application, so that you can use the icons in
++  # the material Icons class.
++  uses-material-design: true
++
++  # To add assets to your application, add an assets section, like this:
++  assets:
++    - assets/cards.json
++
++  # An image asset can refer to one or more resolution-specific "variants", see
++  # https://flutter.dev/to/resolution-aware-images
++
++  # For details regarding adding assets from package dependencies, see
++  # https://flutter.dev/to/asset-from-package
++
++  # To add custom fonts to your application, add a fonts section here,
++  # in this "flutter" section. Each entry in this list should have a
++  # "family" key with the font family name, and a "fonts" key with a
++  # list giving the asset and other descriptors for the font. For
++  # example:
++  # fonts:
++  #   - family: Schyler
++  #     fonts:
++  #       - asset: fonts/Schyler-Regular.ttf
++  #       - asset: fonts/Schyler-Italic.ttf
++  #         style: italic
++  #   - family: Trajan Pro
++  #     fonts:
++  #       - asset: fonts/TrajanPro.ttf
++  #       - asset: fonts/TrajanPro_Bold.ttf
++  #         weight: 700
++  #
++  # For details regarding fonts from package dependencies,
++  # see https://flutter.dev/to/font-from-package
+diff --git a/test/data/card_repository_test.dart b/test/data/card_repository_test.dart
+new file mode 100644
+index 0000000..709435b
+--- /dev/null
++++ b/test/data/card_repository_test.dart
+@@ -0,0 +1,42 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/data/card_repository.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/element.dart';
++
++void main() {
++  test('fromJson parses a common card', () {
++    final card = CardRepository.fromJson({
++      'id': 'fire_deer',
++      'name': 'Горячий Олень',
++      'element': 'fire',
++      'power': 4,
++      'rarity': 'common',
++      'ability': null,
++    });
++    expect(card.id, 'fire_deer');
++    expect(card.element, Element.fire);
++    expect(card.power, 4);
++    expect(card.rarity, Rarity.common);
++    expect(card.ability, isNull);
++  });
++
++  test('fromJson parses a trump card with an ability', () {
++    final card = CardRepository.fromJson({
++      'id': 'trump_pumpkin_king',
++      'name': 'Король-Тыква',
++      'element': 'nature',
++      'power': 9,
++      'rarity': 'trump',
++      'ability': 'doubleStrike',
++    });
++    expect(card.rarity, Rarity.trump);
++    expect(card.ability, Ability.doubleStrike);
++  });
++
++  test('parseAll reads a list', () {
++    const json = '[{"id":"a","name":"A","element":"water","power":5,"rarity":"common","ability":null}]';
++    final cards = CardRepository.parseAll(json);
++    expect(cards, hasLength(1));
++    expect(cards.first.element, Element.water);
++  });
++}
+diff --git a/test/engine/ai_controller_test.dart b/test/engine/ai_controller_test.dart
+new file mode 100644
+index 0000000..fcb6e26
+--- /dev/null
++++ b/test/engine/ai_controller_test.dart
+@@ -0,0 +1,23 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ai_controller.dart';
++import 'package:card_game/engine/duel_engine.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++import 'package:card_game/engine/ability.dart';
++
++GameCard c(String id, int p) =>
++    GameCard(id: id, name: id, element: Element.fire, power: p, rarity: Rarity.common);
++
++void main() {
++  test('AI picks the highest-power card', () {
++    final ai = AiController();
++    final pick = ai.chooseCard(hand: [c('a', 3), c('b', 7), c('d', 5)], config: const DuelConfig());
++    expect(pick.id, 'b');
++  });
++
++  test('AI tie-breaks deterministically by id', () {
++    final ai = AiController();
++    final pick = ai.chooseCard(hand: [c('z', 5), c('a', 5)], config: const DuelConfig());
++    expect(pick.id, 'a');
++  });
++}
+diff --git a/test/engine/deck_test.dart b/test/engine/deck_test.dart
+new file mode 100644
+index 0000000..a985160
+--- /dev/null
++++ b/test/engine/deck_test.dart
+@@ -0,0 +1,37 @@
++import 'dart:math';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/deck.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++
++GameCard c(String id) =>
++    GameCard(id: id, name: id, element: Element.fire, power: 1, rarity: Rarity.common);
++
++void main() {
++  test('draw removes from the top and reports remaining', () {
++    final deck = Deck([c('a'), c('b'), c('c')]);
++    expect(deck.remaining, 3);
++    expect(deck.draw()?.id, 'a');
++    expect(deck.remaining, 2);
++  });
++
++  test('draw returns null when empty', () {
++    final deck = Deck([]);
++    expect(deck.isEmpty, isTrue);
++    expect(deck.draw(), isNull);
++  });
++
++  test('drawUpTo returns fewer cards when deck runs out', () {
++    final deck = Deck([c('a'), c('b')]);
++    final hand = deck.drawUpTo(4);
++    expect(hand.map((e) => e.id), ['a', 'b']);
++    expect(deck.remaining, 0);
++  });
++
++  test('shuffle with a seeded Random is deterministic', () {
++    final d1 = Deck([c('a'), c('b'), c('c'), c('d')])..shuffle(Random(42));
++    final d2 = Deck([c('a'), c('b'), c('c'), c('d')])..shuffle(Random(42));
++    expect(d1.drawUpTo(4).map((e) => e.id), d2.drawUpTo(4).map((e) => e.id));
++  });
++}
+diff --git a/test/engine/duel_engine_test.dart b/test/engine/duel_engine_test.dart
+new file mode 100644
+index 0000000..5353188
+--- /dev/null
++++ b/test/engine/duel_engine_test.dart
+@@ -0,0 +1,123 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/duel_engine.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++
++GameCard card(String id, Element e, int p, {Ability? ability, Rarity rarity = Rarity.common}) =>
++    GameCard(id: id, name: id, element: e, power: p, rarity: ability == null ? rarity : Rarity.trump, ability: ability);
++
++const cfg = DuelConfig();
++
++void main() {
++  group('resolveRound', () {
++    test('higher power wins and deals the difference', () {
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 7),
++        opponentCard: card('o', Element.fire, 4),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.player);
++      expect(r.damage, 3);
++    });
++
++    test('element advantage adds the bonus', () {
++      // Player nature(5) vs opponent water(6): nature beats water -> 5+3=8 vs 6.
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.nature, 5),
++        opponentCard: card('o', Element.water, 6),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.player);
++      expect(r.damage, 2); // 8 - 6
++    });
++
++    test('tie deals no damage', () {
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 5),
++        opponentCard: card('o', Element.fire, 5),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.tie);
++      expect(r.damage, 0);
++    });
++
++    test('shield on the losing card prevents damage', () {
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 3, ability: Ability.shield),
++        opponentCard: card('o', Element.fire, 8),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.opponent);
++      expect(r.damage, 0);
++    });
++
++    test('doubleStrike on the winning card multiplies damage by 1.5 floored', () {
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 9, ability: Ability.doubleStrike),
++        opponentCard: card('o', Element.fire, 4),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.player);
++      expect(r.damage, 7); // (9-4)=5 -> 7.5 -> floor 7
++    });
++
++    test('elementalShift on opponent cancels player element bonus', () {
++      // Player nature(5) vs opponent water(5) with elementalShift: no +3, so 5 vs 5 tie.
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.nature, 5),
++        opponentCard: card('o', Element.water, 5, ability: Ability.elementalShift),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.tie);
++      expect(r.damage, 0);
++    });
++
++    test('barracks bonus boosts the matching player element', () {
++      const boosted = DuelConfig(barracksElement: Element.fire, barracksBonus: 3);
++      // Player fire(5)+3 = 8 vs opponent fire(6).
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 5),
++        opponentCard: card('o', Element.fire, 6),
++        config: boosted,
++      );
++      expect(r.winner, RoundWinner.player);
++      expect(r.damage, 2);
++    });
++
++    test('elementalShift on player card cancels opponent element bonus', () {
++      // Fire beats Nature: opponent fire(5) would get +3 vs player nature(5) -> 8 vs 5.
++      // Player's elementalShift cancels the opponent's bonus -> 5 vs 5 tie.
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.nature, 5, ability: Ability.elementalShift),
++        opponentCard: card('o', Element.fire, 5),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.tie);
++      expect(r.damage, 0);
++    });
++
++    test('doubleStrike applies when the opponent card wins', () {
++      // Same element (no element bonus). Opponent fire(9, doubleStrike) vs player fire(4):
++      // opponent wins, (9-4)=5 -> floor(7.5)=7 damage to the player castle.
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 4),
++        opponentCard: card('o', Element.fire, 9, ability: Ability.doubleStrike),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.opponent);
++      expect(r.damage, 7);
++    });
++
++    test('shield on the winning card does not reduce damage', () {
++      // Same element. Player fire(8, shield) beats opponent fire(3): shield only protects the loser.
++      final r = DuelEngine.resolveRound(
++        playerCard: card('p', Element.fire, 8, ability: Ability.shield),
++        opponentCard: card('o', Element.fire, 3),
++        config: cfg,
++      );
++      expect(r.winner, RoundWinner.player);
++      expect(r.damage, 5);
++    });
++  });
++}
+diff --git a/test/engine/duel_session_test.dart b/test/engine/duel_session_test.dart
+new file mode 100644
+index 0000000..27ff5fe
+--- /dev/null
++++ b/test/engine/duel_session_test.dart
+@@ -0,0 +1,69 @@
++import 'dart:math';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/ai_controller.dart';
++import 'package:card_game/engine/deck.dart';
++import 'package:card_game/engine/duel_engine.dart';
++import 'package:card_game/engine/duel_session.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++
++GameCard c(String id, Element e, int p) =>
++    GameCard(id: id, name: id, element: e, power: p, rarity: Rarity.common);
++
++DuelSession makeSession({required List<GameCard> player, required List<GameCard> opp}) {
++  return DuelSession(
++    playerDeck: Deck(player),
++    opponentDeck: Deck(opp),
++    playerConfig: const DuelConfig(startingCastleHp: 10),
++    opponentConfig: const DuelConfig(startingCastleHp: 10),
++    ai: AiController(),
++    random: Random(1),
++  )..start();
++}
++
++void main() {
++  test('start deals opening hands and sets castle hp', () {
++    final s = makeSession(
++      player: [c('p1', Element.fire, 5), c('p2', Element.fire, 5), c('p3', Element.fire, 5), c('p4', Element.fire, 5)],
++      opp: [c('o1', Element.fire, 1), c('o2', Element.fire, 1), c('o3', Element.fire, 1), c('o4', Element.fire, 1)],
++    );
++    expect(s.playerHand.length, 4);
++    expect(s.opponentHand.length, 4);
++    expect(s.playerCastleHp, 10);
++    expect(s.opponentCastleHp, 10);
++  });
++
++  test('winning a round damages the opponent castle', () {
++    final s = makeSession(
++      player: [c('p1', Element.fire, 9), c('p2', Element.fire, 9), c('p3', Element.fire, 9), c('p4', Element.fire, 9)],
++      opp: [c('o1', Element.fire, 1), c('o2', Element.fire, 1), c('o3', Element.fire, 1), c('o4', Element.fire, 1)],
++    );
++    final card = s.playerHand.first;
++    final result = s.playPlayerCard(card);
++    expect(result.winner, RoundWinner.player);
++    expect(s.opponentCastleHp, lessThan(10));
++  });
++
++  test('reducing opponent castle to zero yields playerWon', () {
++    final s = makeSession(
++      player: [c('p1', Element.fire, 9), c('p2', Element.fire, 9), c('p3', Element.fire, 9), c('p4', Element.fire, 9)],
++      opp: [c('o1', Element.fire, 1), c('o2', Element.fire, 1), c('o3', Element.fire, 1), c('o4', Element.fire, 1)],
++    );
++    var guard = 0;
++    while (s.outcome == DuelOutcome.ongoing && guard++ < 20) {
++      s.playPlayerCard(s.playerHand.first);
++    }
++    expect(s.outcome, DuelOutcome.playerWon);
++  });
++
++  test('opponent winning a round damages the player castle', () {
++    final s = makeSession(
++      player: [c('p1', Element.fire, 1), c('p2', Element.fire, 1), c('p3', Element.fire, 1), c('p4', Element.fire, 1)],
++      opp: [c('o1', Element.fire, 9), c('o2', Element.fire, 9), c('o3', Element.fire, 9), c('o4', Element.fire, 9)],
++    );
++    final result = s.playPlayerCard(s.playerHand.first);
++    expect(result.winner, RoundWinner.opponent);
++    expect(s.playerCastleHp, lessThan(10));
++  });
++}
+diff --git a/test/engine/element_test.dart b/test/engine/element_test.dart
+new file mode 100644
+index 0000000..cb11495
+--- /dev/null
++++ b/test/engine/element_test.dart
+@@ -0,0 +1,28 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++
++void main() {
++  group('ElementRules.beats', () {
++    test('fire beats nature', () {
++      expect(ElementRules.beats(Element.fire, Element.nature), isTrue);
++    });
++    test('nature beats water', () {
++      expect(ElementRules.beats(Element.nature, Element.water), isTrue);
++    });
++    test('water beats fire', () {
++      expect(ElementRules.beats(Element.water, Element.fire), isTrue);
++    });
++    test('relationship is not symmetric', () {
++      expect(ElementRules.beats(Element.nature, Element.fire), isFalse);
++      expect(ElementRules.beats(Element.water, Element.nature), isFalse);
++      expect(ElementRules.beats(Element.fire, Element.water), isFalse);
++    });
++    test('same element has no advantage', () {
++      expect(ElementRules.beats(Element.fire, Element.fire), isFalse);
++    });
++  });
++
++  test('element bonus is 3', () {
++    expect(kElementBonus, 3);
++  });
++}
+diff --git a/test/engine/game_card_test.dart b/test/engine/game_card_test.dart
+new file mode 100644
+index 0000000..2bbd746
+--- /dev/null
++++ b/test/engine/game_card_test.dart
+@@ -0,0 +1,38 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++
++void main() {
++  test('constructs a common card with no ability', () {
++    const card = GameCard(
++      id: 'fire_deer',
++      name: 'Горячий Олень',
++      element: Element.fire,
++      power: 5,
++      rarity: Rarity.common,
++    );
++    expect(card.ability, isNull);
++    expect(card.rarity, Rarity.common);
++    expect(card.power, 5);
++  });
++
++  test('constructs a trump card with an ability', () {
++    const trump = GameCard(
++      id: 'pumpkin_king',
++      name: 'Король-Тыква',
++      element: Element.nature,
++      power: 9,
++      rarity: Rarity.trump,
++      ability: Ability.doubleStrike,
++    );
++    expect(trump.ability, Ability.doubleStrike);
++  });
++
++  test('cards are equal by id', () {
++    const a = GameCard(id: 'x', name: 'A', element: Element.fire, power: 1, rarity: Rarity.common);
++    const b = GameCard(id: 'x', name: 'A clone', element: Element.water, power: 9, rarity: Rarity.rare);
++    expect(a, equals(b));
++    expect(a.hashCode, b.hashCode);
++  });
++}
+diff --git a/test/engine/kingdom_test.dart b/test/engine/kingdom_test.dart
+new file mode 100644
+index 0000000..1c4417c
+--- /dev/null
++++ b/test/engine/kingdom_test.dart
+@@ -0,0 +1,41 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/kingdom.dart';
++
++void main() {
++  test('default kingdom is all level 1 with fire barracks', () {
++    const k = Kingdom();
++    expect(k.barracksLevel, 1);
++    expect(k.wallLevel, 1);
++    expect(k.mineLevel, 1);
++    expect(k.barracksElement, Element.fire);
++  });
++
++  test('building effects scale with level', () {
++    const k = Kingdom(barracksLevel: 1, wallLevel: 2, mineLevel: 3);
++    expect(k.barracksBonus, 1);
++    expect(k.wallHpBonus, 10);
++    expect(k.mineCrystalsPerWin, 6);
++  });
++
++  test('upgrading increments level and caps at 3', () {
++    var k = const Kingdom(barracksLevel: 2);
++    k = k.upgraded(BuildingType.barracks);
++    expect(k.barracksLevel, 3);
++    k = k.upgraded(BuildingType.barracks);
++    expect(k.barracksLevel, 3); // capped
++  });
++
++  test('upgrade cost table', () {
++    expect(KingdomEconomy.upgradeCost(BuildingType.wall, 1), 10);
++    expect(KingdomEconomy.upgradeCost(BuildingType.wall, 2), 25);
++  });
++
++  test('toDuelConfig maps wall hp and barracks bonus', () {
++    const k = Kingdom(barracksLevel: 3, wallLevel: 2, barracksElement: Element.water);
++    final cfg = KingdomEconomy.toDuelConfig(k);
++    expect(cfg.startingCastleHp, 40); // 30 base + 10 wall
++    expect(cfg.barracksElement, Element.water);
++    expect(cfg.barracksBonus, 3);
++  });
++}
+diff --git a/test/models/save_state_test.dart b/test/models/save_state_test.dart
+new file mode 100644
+index 0000000..4f0be10
+--- /dev/null
++++ b/test/models/save_state_test.dart
+@@ -0,0 +1,49 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/kingdom.dart';
++import 'package:card_game/models/save_state.dart';
++import 'package:card_game/models/save_store.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++
++void main() {
++  test('initial state has starter content', () {
++    final s = SaveState.initial();
++    expect(s.crystals, 0);
++    expect(s.unlockedNodeIndex, 0);
++    expect(s.ownedCardIds, contains('trump_starter_drake'));
++    expect(s.ownedCardIds.length, greaterThanOrEqualTo(13));
++  });
++
++  test('json round-trip preserves all fields', () {
++    final s = SaveState(
++      crystals: 42,
++      kingdom: const Kingdom(barracksLevel: 2, wallLevel: 3, mineLevel: 1, barracksElement: Element.water),
++      ownedCardIds: {'a', 'b'},
++      unlockedNodeIndex: 2,
++    );
++    final restored = SaveState.fromJson(s.toJson());
++    expect(restored.crystals, 42);
++    expect(restored.kingdom.wallLevel, 3);
++    expect(restored.kingdom.barracksElement, Element.water);
++    expect(restored.ownedCardIds, {'a', 'b'});
++    expect(restored.unlockedNodeIndex, 2);
++  });
++
++  persistenceTests();
++}
++
++void persistenceTests() {
++  test('SaveStore returns initial when nothing stored', () async {
++    SharedPreferences.setMockInitialValues({});
++    final state = await SaveStore().load();
++    expect(state.crystals, 0);
++  });
++
++  test('SaveStore persists and reloads', () async {
++    SharedPreferences.setMockInitialValues({});
++    final store = SaveStore();
++    await store.save(SaveState.initial().copyWith(crystals: 99));
++    final reloaded = await store.load();
++    expect(reloaded.crystals, 99);
++  });
++}
+diff --git a/test/setup_smoke_test.dart b/test/setup_smoke_test.dart
+new file mode 100644
+index 0000000..3e1419f
+--- /dev/null
++++ b/test/setup_smoke_test.dart
+@@ -0,0 +1,7 @@
++import 'package:flutter_test/flutter_test.dart';
++
++void main() {
++  test('toolchain is wired up', () {
++    expect(1 + 1, 2);
++  });
++}
+diff --git a/test/ui/app_smoke_test.dart b/test/ui/app_smoke_test.dart
+new file mode 100644
+index 0000000..4808e13
+--- /dev/null
++++ b/test/ui/app_smoke_test.dart
+@@ -0,0 +1,13 @@
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/app.dart';
++
++void main() {
++  testWidgets('app boots to the world map', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(child: CardGameApp()));
++    await tester.pumpAndSettle();
++    expect(find.text('Карта мира'), findsOneWidget);
++  });
++}
+diff --git a/test/ui/duel_reward_test.dart b/test/ui/duel_reward_test.dart
+new file mode 100644
+index 0000000..71e2521
+--- /dev/null
++++ b/test/ui/duel_reward_test.dart
+@@ -0,0 +1,45 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/models/save_state.dart';
++import 'package:card_game/ui/duel_setup.dart';
++
++void main() {
++  final base = SaveState.initial();
++
++  test('loss grants nothing', () {
++    final r = computeDuelReward(node: kSliceNodes[0], save: base, won: false);
++    expect(r.crystalsEarned, 0);
++    expect(r.unlockNext, isFalse);
++    expect(r.trumpGranted, isNull);
++  });
++
++  test('win grants 5 + mine bonus crystals', () {
++    final r = computeDuelReward(node: kSliceNodes[0], save: base, won: true);
++    expect(r.crystalsEarned, 5 + base.kingdom.mineCrystalsPerWin);
++  });
++
++  test('winning the frontier node unlocks the next', () {
++    final r = computeDuelReward(node: kSliceNodes[0], save: base, won: true);
++    expect(r.unlockNext, isTrue);
++  });
++
++  test('winning the last (boss) node does not unlock past the end and grants its trump', () {
++    final boss = kSliceNodes.last;
++    final atBoss = base.copyWith(unlockedNodeIndex: boss.index);
++    final r = computeDuelReward(node: boss, save: atBoss, won: true);
++    expect(r.unlockNext, isFalse);
++    expect(r.trumpGranted, boss.rewardTrumpId);
++    expect(r.trumpGranted, isNotNull);
++  });
++
++  test('re-winning an already-cleared node does not unlock again', () {
++    final ahead = base.copyWith(unlockedNodeIndex: 2);
++    final r = computeDuelReward(node: kSliceNodes[0], save: ahead, won: true);
++    expect(r.unlockNext, isFalse);
++  });
++
++  test('chest roll is deterministic for a given node', () {
++    final a = computeDuelReward(node: kSliceNodes[1], save: base, won: true);
++    final b = computeDuelReward(node: kSliceNodes[1], save: base, won: true);
++    expect(a.trumpGranted, b.trumpGranted); // same seed -> same outcome
++  });
++}
+diff --git a/test/ui/duel_screen_test.dart b/test/ui/duel_screen_test.dart
+new file mode 100644
+index 0000000..08de07f
+--- /dev/null
++++ b/test/ui/duel_screen_test.dart
+@@ -0,0 +1,19 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/duel_screen.dart';
++import 'package:card_game/ui/duel_setup.dart';
++
++void main() {
++  testWidgets('duel screen renders castle hp and a playable hand', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(ProviderScope(
++      child: MaterialApp(home: DuelScreen(node: kSliceNodes.first)),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.textContaining('Замок'), findsWidgets);
++    // Hand cards are rendered as InkWell-wrapped tiles; at least one exists.
++    expect(find.byType(Card), findsWidgets);
++  });
++}
+diff --git a/test/ui/kingdom_screen_test.dart b/test/ui/kingdom_screen_test.dart
+new file mode 100644
+index 0000000..e93ae72
+--- /dev/null
++++ b/test/ui/kingdom_screen_test.dart
+@@ -0,0 +1,45 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/kingdom_screen.dart';
++import 'package:card_game/state/providers.dart';
++import 'package:card_game/engine/kingdom.dart';
++
++void main() {
++  testWidgets('kingdom screen lists three buildings', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(
++      child: MaterialApp(home: KingdomScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.text('Казарма'), findsOneWidget);
++    expect(find.text('Стена'), findsOneWidget);
++    expect(find.text('Шахта'), findsOneWidget);
++  });
++
++  testWidgets('craft button is absent below barracks level 3', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(
++      child: MaterialApp(home: KingdomScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.textContaining('Создать козырь'), findsNothing);
++  });
++
++  testWidgets('craft button appears only at barracks level 3', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    final container = ProviderContainer();
++    // Force barracks to level 3 with plenty of crystals.
++    final ctrl = container.read(saveStateProvider.notifier);
++    ctrl.addCrystals(100);
++    ctrl.tryUpgrade(BuildingType.barracks); // 1->2
++    ctrl.tryUpgrade(BuildingType.barracks); // 2->3
++    await tester.pumpWidget(UncontrolledProviderScope(
++      container: container,
++      child: const MaterialApp(home: KingdomScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.textContaining('Создать козырь'), findsOneWidget);
++  });
++}
+diff --git a/test/ui/world_map_test.dart b/test/ui/world_map_test.dart
+new file mode 100644
+index 0000000..f1dd21e
+--- /dev/null
++++ b/test/ui/world_map_test.dart
+@@ -0,0 +1,18 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/world_map_screen.dart';
++
++void main() {
++  testWidgets('world map shows nodes and locks future ones', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(
++      child: MaterialApp(home: WorldMapScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.text('Карта мира'), findsOneWidget);
++    expect(find.text('Тренировка'), findsOneWidget);
++    expect(find.textContaining('БОСС'), findsOneWidget);
++  });
++}

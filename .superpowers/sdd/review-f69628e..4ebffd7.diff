@@ -1,0 +1,147 @@
+# Review package: f69628e..4ebffd70ec01517b40a8d613f222b890b94c2f2b
+
+## Commits
+4ebffd7 feat: add kingdom buildings, upgrades, and economy
+
+## Files changed
+ lib/engine/kingdom.dart       | 83 +++++++++++++++++++++++++++++++++++++++++++
+ test/engine/kingdom_test.dart | 41 +++++++++++++++++++++
+ 2 files changed, 124 insertions(+)
+
+## Diff
+diff --git a/lib/engine/kingdom.dart b/lib/engine/kingdom.dart
+new file mode 100644
+index 0000000..374a702
+--- /dev/null
++++ b/lib/engine/kingdom.dart
+@@ -0,0 +1,83 @@
++import 'duel_engine.dart';
++import 'element.dart';
++
++enum BuildingType { barracks, wall, mine }
++
++class Kingdom {
++  final int barracksLevel;
++  final int wallLevel;
++  final int mineLevel;
++  final Element barracksElement;
++
++  const Kingdom({
++    this.barracksLevel = 1,
++    this.wallLevel = 1,
++    this.mineLevel = 1,
++    this.barracksElement = Element.fire,
++  });
++
++  int get barracksBonus => barracksLevel; // 1/2/3
++  int get wallHpBonus => wallLevel * 5; // 5/10/15
++  int get mineCrystalsPerWin => mineLevel * 2; // 2/4/6
++
++  int levelOf(BuildingType type) {
++    switch (type) {
++      case BuildingType.barracks:
++        return barracksLevel;
++      case BuildingType.wall:
++        return wallLevel;
++      case BuildingType.mine:
++        return mineLevel;
++    }
++  }
++
++  Kingdom upgraded(BuildingType type) {
++    int cap(int level) => level >= 3 ? 3 : level + 1;
++    switch (type) {
++      case BuildingType.barracks:
++        return copyWith(barracksLevel: cap(barracksLevel));
++      case BuildingType.wall:
++        return copyWith(wallLevel: cap(wallLevel));
++      case BuildingType.mine:
++        return copyWith(mineLevel: cap(mineLevel));
++    }
++  }
++
++  Kingdom copyWith({
++    int? barracksLevel,
++    int? wallLevel,
++    int? mineLevel,
++    Element? barracksElement,
++  }) {
++    return Kingdom(
++      barracksLevel: barracksLevel ?? this.barracksLevel,
++      wallLevel: wallLevel ?? this.wallLevel,
++      mineLevel: mineLevel ?? this.mineLevel,
++      barracksElement: barracksElement ?? this.barracksElement,
++    );
++  }
++}
++
++class KingdomEconomy {
++  const KingdomEconomy._();
++
++  /// Crystal cost to upgrade *from* [currentLevel]. Level 3 is the cap.
++  static int upgradeCost(BuildingType type, int currentLevel) {
++    switch (currentLevel) {
++      case 1:
++        return 10;
++      case 2:
++        return 25;
++      default:
++        return 0; // already max
++    }
++  }
++
++  static DuelConfig toDuelConfig(Kingdom k) {
++    return DuelConfig(
++      startingCastleHp: 30 + k.wallHpBonus,
++      barracksElement: k.barracksElement,
++      barracksBonus: k.barracksBonus,
++    );
++  }
++}
+diff --git a/test/engine/kingdom_test.dart b/test/engine/kingdom_test.dart
+new file mode 100644
+index 0000000..1c4417c
+--- /dev/null
++++ b/test/engine/kingdom_test.dart
+@@ -0,0 +1,41 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/kingdom.dart';
++
++void main() {
++  test('default kingdom is all level 1 with fire barracks', () {
++    const k = Kingdom();
++    expect(k.barracksLevel, 1);
++    expect(k.wallLevel, 1);
++    expect(k.mineLevel, 1);
++    expect(k.barracksElement, Element.fire);
++  });
++
++  test('building effects scale with level', () {
++    const k = Kingdom(barracksLevel: 1, wallLevel: 2, mineLevel: 3);
++    expect(k.barracksBonus, 1);
++    expect(k.wallHpBonus, 10);
++    expect(k.mineCrystalsPerWin, 6);
++  });
++
++  test('upgrading increments level and caps at 3', () {
++    var k = const Kingdom(barracksLevel: 2);
++    k = k.upgraded(BuildingType.barracks);
++    expect(k.barracksLevel, 3);
++    k = k.upgraded(BuildingType.barracks);
++    expect(k.barracksLevel, 3); // capped
++  });
++
++  test('upgrade cost table', () {
++    expect(KingdomEconomy.upgradeCost(BuildingType.wall, 1), 10);
++    expect(KingdomEconomy.upgradeCost(BuildingType.wall, 2), 25);
++  });
++
++  test('toDuelConfig maps wall hp and barracks bonus', () {
++    const k = Kingdom(barracksLevel: 3, wallLevel: 2, barracksElement: Element.water);
++    final cfg = KingdomEconomy.toDuelConfig(k);
++    expect(cfg.startingCastleHp, 40); // 30 base + 10 wall
++    expect(cfg.barracksElement, Element.water);
++    expect(cfg.barracksBonus, 3);
++  });
++}

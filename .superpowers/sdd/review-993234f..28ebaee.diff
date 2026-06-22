@@ -1,0 +1,169 @@
+# Review package: 993234f..28ebaeeb3ba4c9c2362f230fc4888ff4737f0185
+
+## Commits
+28ebaee feat: add save state model and shared_preferences persistence
+
+## Files changed
+ lib/models/save_state.dart       | 71 ++++++++++++++++++++++++++++++++++++++++
+ lib/models/save_store.dart       | 19 +++++++++++
+ test/models/save_state_test.dart | 49 +++++++++++++++++++++++++++
+ 3 files changed, 139 insertions(+)
+
+## Diff
+diff --git a/lib/models/save_state.dart b/lib/models/save_state.dart
+new file mode 100644
+index 0000000..ce588a0
+--- /dev/null
++++ b/lib/models/save_state.dart
+@@ -0,0 +1,71 @@
++import '../engine/element.dart';
++import '../engine/kingdom.dart';
++
++const _starterCommonIds = [
++  'fire_deer', 'fire_rooster', 'fire_pie', 'fire_phoenix_pearl',
++  'nature_zucchini', 'nature_forester', 'nature_mushroom', 'nature_hedgehog',
++  'water_jellyfish', 'water_puddle', 'water_beaver', 'water_dumpling',
++];
++
++class SaveState {
++  final int crystals;
++  final Kingdom kingdom;
++  final Set<String> ownedCardIds;
++  final int unlockedNodeIndex;
++
++  const SaveState({
++    required this.crystals,
++    required this.kingdom,
++    required this.ownedCardIds,
++    required this.unlockedNodeIndex,
++  });
++
++  static SaveState initial() => SaveState(
++        crystals: 0,
++        kingdom: const Kingdom(),
++        ownedCardIds: {..._starterCommonIds, 'trump_starter_drake'},
++        unlockedNodeIndex: 0,
++      );
++
++  SaveState copyWith({
++    int? crystals,
++    Kingdom? kingdom,
++    Set<String>? ownedCardIds,
++    int? unlockedNodeIndex,
++  }) {
++    return SaveState(
++      crystals: crystals ?? this.crystals,
++      kingdom: kingdom ?? this.kingdom,
++      ownedCardIds: ownedCardIds ?? this.ownedCardIds,
++      unlockedNodeIndex: unlockedNodeIndex ?? this.unlockedNodeIndex,
++    );
++  }
++
++  Map<String, dynamic> toJson() => {
++        'crystals': crystals,
++        'kingdom': {
++          'barracksLevel': kingdom.barracksLevel,
++          'wallLevel': kingdom.wallLevel,
++          'mineLevel': kingdom.mineLevel,
++          'barracksElement': kingdom.barracksElement.name,
++        },
++        'ownedCardIds': ownedCardIds.toList(),
++        'unlockedNodeIndex': unlockedNodeIndex,
++      };
++
++  factory SaveState.fromJson(Map<String, dynamic> json) {
++    final k = json['kingdom'] as Map<String, dynamic>;
++    return SaveState(
++      crystals: json['crystals'] as int,
++      kingdom: Kingdom(
++        barracksLevel: k['barracksLevel'] as int,
++        wallLevel: k['wallLevel'] as int,
++        mineLevel: k['mineLevel'] as int,
++        barracksElement:
++            Element.values.firstWhere((e) => e.name == k['barracksElement']),
++      ),
++      ownedCardIds: (json['ownedCardIds'] as List<dynamic>).cast<String>().toSet(),
++      unlockedNodeIndex: json['unlockedNodeIndex'] as int,
++    );
++  }
++}
+diff --git a/lib/models/save_store.dart b/lib/models/save_store.dart
+new file mode 100644
+index 0000000..2ddc449
+--- /dev/null
++++ b/lib/models/save_store.dart
+@@ -0,0 +1,19 @@
++import 'dart:convert';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'save_state.dart';
++
++class SaveStore {
++  static const _key = 'save_v1';
++
++  Future<SaveState> load() async {
++    final prefs = await SharedPreferences.getInstance();
++    final raw = prefs.getString(_key);
++    if (raw == null) return SaveState.initial();
++    return SaveState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
++  }
++
++  Future<void> save(SaveState state) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setString(_key, jsonEncode(state.toJson()));
++  }
++}
+diff --git a/test/models/save_state_test.dart b/test/models/save_state_test.dart
+new file mode 100644
+index 0000000..4f0be10
+--- /dev/null
++++ b/test/models/save_state_test.dart
+@@ -0,0 +1,49 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/kingdom.dart';
++import 'package:card_game/models/save_state.dart';
++import 'package:card_game/models/save_store.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++
++void main() {
++  test('initial state has starter content', () {
++    final s = SaveState.initial();
++    expect(s.crystals, 0);
++    expect(s.unlockedNodeIndex, 0);
++    expect(s.ownedCardIds, contains('trump_starter_drake'));
++    expect(s.ownedCardIds.length, greaterThanOrEqualTo(13));
++  });
++
++  test('json round-trip preserves all fields', () {
++    final s = SaveState(
++      crystals: 42,
++      kingdom: const Kingdom(barracksLevel: 2, wallLevel: 3, mineLevel: 1, barracksElement: Element.water),
++      ownedCardIds: {'a', 'b'},
++      unlockedNodeIndex: 2,
++    );
++    final restored = SaveState.fromJson(s.toJson());
++    expect(restored.crystals, 42);
++    expect(restored.kingdom.wallLevel, 3);
++    expect(restored.kingdom.barracksElement, Element.water);
++    expect(restored.ownedCardIds, {'a', 'b'});
++    expect(restored.unlockedNodeIndex, 2);
++  });
++
++  persistenceTests();
++}
++
++void persistenceTests() {
++  test('SaveStore returns initial when nothing stored', () async {
++    SharedPreferences.setMockInitialValues({});
++    final state = await SaveStore().load();
++    expect(state.crystals, 0);
++  });
++
++  test('SaveStore persists and reloads', () async {
++    SharedPreferences.setMockInitialValues({});
++    final store = SaveStore();
++    await store.save(SaveState.initial().copyWith(crystals: 99));
++    final reloaded = await store.load();
++    expect(reloaded.crystals, 99);
++  });
++}
