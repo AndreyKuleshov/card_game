@@ -70,6 +70,7 @@ void main() {
         config: cfg,
       );
       expect(r.winner, RoundWinner.tie);
+      expect(r.damage, 0);
     });
 
     test('barracks bonus boosts the matching player element', () {
@@ -82,6 +83,41 @@ void main() {
       );
       expect(r.winner, RoundWinner.player);
       expect(r.damage, 2);
+    });
+
+    test('elementalShift on player card cancels opponent element bonus', () {
+      // Fire beats Nature: opponent fire(5) would get +3 vs player nature(5) -> 8 vs 5.
+      // Player's elementalShift cancels the opponent's bonus -> 5 vs 5 tie.
+      final r = DuelEngine.resolveRound(
+        playerCard: card('p', Element.nature, 5, ability: Ability.elementalShift),
+        opponentCard: card('o', Element.fire, 5),
+        config: cfg,
+      );
+      expect(r.winner, RoundWinner.tie);
+      expect(r.damage, 0);
+    });
+
+    test('doubleStrike applies when the opponent card wins', () {
+      // Same element (no element bonus). Opponent fire(9, doubleStrike) vs player fire(4):
+      // opponent wins, (9-4)=5 -> floor(7.5)=7 damage to the player castle.
+      final r = DuelEngine.resolveRound(
+        playerCard: card('p', Element.fire, 4),
+        opponentCard: card('o', Element.fire, 9, ability: Ability.doubleStrike),
+        config: cfg,
+      );
+      expect(r.winner, RoundWinner.opponent);
+      expect(r.damage, 7);
+    });
+
+    test('shield on the winning card does not reduce damage', () {
+      // Same element. Player fire(8, shield) beats opponent fire(3): shield only protects the loser.
+      final r = DuelEngine.resolveRound(
+        playerCard: card('p', Element.fire, 8, ability: Ability.shield),
+        opponentCard: card('o', Element.fire, 3),
+        config: cfg,
+      );
+      expect(r.winner, RoundWinner.player);
+      expect(r.damage, 5);
     });
   });
 }
