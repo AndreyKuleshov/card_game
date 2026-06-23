@@ -9,6 +9,7 @@ import '../engine/game_card.dart';
 import '../state/providers.dart';
 import 'art.dart';
 import 'duel_setup.dart';
+import 'game_assets.dart';
 import 'reward_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -97,11 +98,17 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
     return Scaffold(
       appBar: AppBar(title: Text(widget.node.title)),
       body: Container(
+        // Gradient base doubles as a fallback if the table image is missing.
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: GameColors.tabletopStops,
+          ),
+          image: DecorationImage(
+            image: AssetImage(GameAssets.duelTable),
+            fit: BoxFit.cover,
+            opacity: 0.92,
           ),
         ),
         child: SafeArea(
@@ -208,36 +215,37 @@ class _OpponentZone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Villain sits at the far (top) edge of the table; HP scale above him and
+    // his face-down cards laid on the table in front (overlapping his lap), so
+    // he reads as "sitting at the table" rather than floating.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const DuelistPainterView(isOpponent: true, size: 44),
-            const SizedBox(width: 8),
-            Expanded(
-              child: HpBar(
-                current: session.opponentCastleHp,
-                max: session.opponentConfig.startingCastleHp,
-                label: 'Замок врага',
-                color: const Color(0xFFE53935),
+        HpBar(
+          current: session.opponentCastleHp,
+          max: session.opponentConfig.startingCastleHp,
+          label: 'Замок врага',
+          color: const Color(0xFFE53935),
+        ),
+        const SizedBox(height: 2),
+        const Center(child: DuelistPainterView(isOpponent: true, size: 104)),
+        // Cards pulled up to overlap the seated villain (cards on the table).
+        Transform.translate(
+          offset: const Offset(0, -16),
+          child: Center(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final _ in session.opponentHand)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 3),
+                      child: CardBack(width: 48),
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // Opponent hand as face-down cards
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final _ in session.opponentHand)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: CardBack(width: 52),
-                ),
-            ],
           ),
         ),
       ],
@@ -267,15 +275,26 @@ class _BattleZone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (result == null) {
-      return const Center(
-        child: Text(
-          'Выбери карту, чтобы атаковать',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+      // Idle: a defined "table" play area in the centre where cards will clash.
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(36),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withAlpha(70), width: 2),
           ),
-          textAlign: TextAlign.center,
+          child: const Text(
+            'Выбери карту,\nчтобы атаковать',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
@@ -548,40 +567,42 @@ class _PlayerZone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Top-to-bottom (mirrors the opponent): hand → large character → HP scale.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const DuelistPainterView(isOpponent: false, size: 44),
-            const SizedBox(width: 8),
-            Expanded(
-              child: HpBar(
-                current: session.playerCastleHp,
-                max: session.playerConfig.startingCastleHp,
-                label: 'Твой замок',
-                color: const Color(0xFF1565C0),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final card in session.playerHand)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: GameCardView(
-                    card: card,
-                    width: 80,
-                    onTap: resolved ? null : () => onCardTap(card),
+        Center(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final card in session.playerHand)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: GameCardView(
+                      card: card,
+                      width: 78,
+                      onTap: resolved ? null : () => onCardTap(card),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
+        ),
+        // Hero pulled up slightly so the cards sit on the table in front of him.
+        Transform.translate(
+          offset: const Offset(0, -10),
+          child: const Center(
+            child: DuelistPainterView(isOpponent: false, size: 104),
+          ),
+        ),
+        const SizedBox(height: 2),
+        HpBar(
+          current: session.playerCastleHp,
+          max: session.playerConfig.startingCastleHp,
+          label: 'Твой замок',
+          color: const Color(0xFF1565C0),
         ),
       ],
     );

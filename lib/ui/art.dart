@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../engine/kingdom.dart';
+import 'game_assets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CastlePainterView
@@ -16,8 +17,11 @@ class CastlePainterView extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _CastlePainter(),
+      child: Image.asset(
+        GameAssets.castle,
+        fit: BoxFit.contain,
+        // Fall back to the hand-drawn castle if the asset is missing.
+        errorBuilder: (_, _, _) => CustomPaint(painter: _CastlePainter()),
       ),
     );
   }
@@ -184,11 +188,24 @@ class BuildingArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Level 0 = empty plot: keep the procedural "buildable spot" look.
+    if (level == 0) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _BuildingPainter(type: type, level: level)),
+      );
+    }
+
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _BuildingPainter(type: type, level: level),
+      child: Image.asset(
+        GameAssets.building(type),
+        fit: BoxFit.contain,
+        // Fall back to the hand-drawn building if the asset is missing.
+        errorBuilder: (_, _, _) =>
+            CustomPaint(painter: _BuildingPainter(type: type, level: level)),
       ),
     );
   }
@@ -790,8 +807,12 @@ class DuelistPainterView extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _DuelistPainter(isOpponent: isOpponent),
+      child: Image.asset(
+        GameAssets.duelist(isOpponent: isOpponent),
+        fit: BoxFit.contain,
+        // Fall back to the hand-drawn duelist if the asset is missing.
+        errorBuilder: (_, _, _) =>
+            CustomPaint(painter: _DuelistPainter(isOpponent: isOpponent)),
       ),
     );
   }

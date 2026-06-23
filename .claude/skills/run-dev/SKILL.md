@@ -7,9 +7,11 @@ description: Use when you need to start or restart the local dev stand for this 
 
 ## Overview
 
-Launches the card game's local dev stand: the Flutter **web** build served on Chrome at `http://127.0.0.1:8080`. The backend API is remote (Coolify) at `https://cardsspg.duckdns.org`, so **no local server is needed** — only the Flutter web dev server.
+Launches the card game's local dev stand: the Flutter **web** build served at `http://127.0.0.1:8080` via the `web-server` device. The backend API is remote (Coolify) at `https://cardsspg.duckdns.org`, so **no local server is needed** — only the Flutter web dev server.
 
-`flutter run` is long-lived: it builds, opens Chrome, then stays attached for hot reload. So launch it in the background and wait for the ready line.
+The `web-server` device serves the app but does **not** open a browser window itself — so relaunching never piles up Chrome windows. Keep one tab open at the URL and **hard-refresh (Cmd+Shift+R)** to pick up a new build.
+
+`flutter run` is long-lived: it builds, serves, then stays attached. So launch it in the background and wait for the ready line.
 
 ## How to launch (agent procedure)
 
