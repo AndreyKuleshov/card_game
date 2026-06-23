@@ -165,6 +165,9 @@ ENTITIES = [
     ("node_battle",        "map", "node", "a crossed-swords battle icon with a small red flag"),
     ("node_boss",          "map", "node", "a fiery skull-pumpkin boss icon, glowing, dangerous"),
     ("node_locked",        "map", "node", "a golden padlock icon, greyed locked state"),
+    # Distinct enemy markers per opponent tier (weaker → tougher).
+    ("enemy_1",            "map", "node", "a small green goblin grunt head with a tiny dagger, weak low-tier enemy, slightly comedic, round badge"),
+    ("enemy_2",            "map", "node", "a tough brown orc brute head with tusks and war-paint and a spiked helmet, stronger mid-tier enemy, menacing, round badge"),
 
     # --- Иконки UI / валюта ---
     ("icon_crystal",       "icons", "icon", "a single glowing blue crystal gem, faceted, sparkle"),

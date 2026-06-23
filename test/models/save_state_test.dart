@@ -8,7 +8,7 @@ void main() {
   test('initial state has starter content', () {
     final s = SaveState.initial();
     expect(s.crystals, 0);
-    expect(s.unlockedNodeIndex, 0);
+    expect(s.unlockedNodeIndex, 1); // first opponent; training is always open
     expect(s.ownedCardIds, contains('trump_starter_drake'));
     expect(s.ownedCardIds.length, greaterThanOrEqualTo(13));
   });

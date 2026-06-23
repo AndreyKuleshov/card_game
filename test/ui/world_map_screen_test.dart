@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:card_game/ui/kingdom_screen.dart';
+import 'package:card_game/ui/world_map_screen.dart';
 import 'package:card_game/state/providers.dart';
 import 'package:card_game/engine/kingdom.dart';
 
@@ -10,7 +10,7 @@ void main() {
   testWidgets('kingdom screen lists five buildings', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ProviderScope(
-      child: MaterialApp(home: KingdomScreen()),
+      child: MaterialApp(home: WorldMapScreen()),
     ));
     await tester.pumpAndSettle();
     // Titles appear on the scene AND in the panel, so we expect at least one.
@@ -24,7 +24,7 @@ void main() {
   testWidgets('craft button is absent below fireForge level 3', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ProviderScope(
-      child: MaterialApp(home: KingdomScreen()),
+      child: MaterialApp(home: WorldMapScreen()),
     ));
     await tester.pumpAndSettle();
     expect(find.textContaining('Создать козырь'), findsNothing);
@@ -41,7 +41,7 @@ void main() {
     ctrl.tryUpgrade(BuildingType.fireForge); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: KingdomScreen()),
+      child: const MaterialApp(home: WorldMapScreen()),
     ));
     await tester.pumpAndSettle();
     expect(find.textContaining('Создать козырь'), findsOneWidget);
@@ -58,8 +58,12 @@ void main() {
     ctrl.tryUpgrade(BuildingType.fireForge); // 2->3
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: KingdomScreen()),
+      child: const MaterialApp(home: WorldMapScreen()),
     ));
+    await tester.pumpAndSettle();
+    // The taller scene can push the craft button below the fold in the test
+    // viewport, so scroll it into view before tapping.
+    await tester.ensureVisible(find.text('Создать козырь (40💎)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Создать козырь (40💎)'));
     await tester.pumpAndSettle();

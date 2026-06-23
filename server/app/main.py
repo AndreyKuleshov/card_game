@@ -3,6 +3,7 @@ import os
 import secrets
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -53,7 +54,10 @@ async def healthz():
 
 
 @app.post("/v1/players", response_model=CreatePlayerResponse, status_code=201)
-async def create_player(body: CreatePlayerRequest):
+async def create_player(body: CreatePlayerRequest | None = None):
+    # Anonymous players are created with no body, so the request body is
+    # optional; display_name defaults to None.
+    display_name = body.display_name if body else None
     player_id = uuid.uuid4()
     token = secrets.token_urlsafe(32)
     token_hash = hash_token(token)
@@ -63,7 +67,7 @@ async def create_player(body: CreatePlayerRequest):
             "INSERT INTO cardgame.players (id, token_hash, display_name) VALUES ($1, $2, $3)",
             player_id,
             token_hash,
-            body.display_name,
+            display_name,
         )
     return CreatePlayerResponse(player_id=player_id, token=token)
 
@@ -77,7 +81,15 @@ async def get_progress(player: dict = Depends(current_player)):
             uuid.UUID(player["player_id"]),
         )
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No progress found")
+        # No saved progress yet → return an empty progress with 200 (instead of
+        # 404). The client treats empty data as "nothing in the cloud" and keeps
+        # its local state, then pushes it to create the row.
+        return ProgressResponse(
+            data={},
+            crystals=0,
+            schema_version=0,
+            updated_at=datetime.fromtimestamp(0, tz=timezone.utc),
+        )
     import json
     return ProgressResponse(
         data=json.loads(row["data"]) if isinstance(row["data"], str) else row["data"],

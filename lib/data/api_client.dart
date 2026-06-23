@@ -21,12 +21,16 @@ class ApiClient {
   Future<PlayerCredentials> createPlayer() async {
     final uri = Uri.parse('$kApiBaseUrl/v1/players');
     final response = await _client
-        .post(uri, headers: {'Content-Type': 'application/json'})
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(<String, dynamic>{}),
+        )
         .timeout(_timeout);
     _checkResponse(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return (
-      playerId: body['id'] as String,
+      playerId: body['player_id'] as String,
       token: body['token'] as String,
     );
   }
@@ -53,7 +57,7 @@ class ApiClient {
     final body = jsonEncode({
       'data': data,
       'crystals': crystals,
-      'schemaVersion': schemaVersion,
+      'schema_version': schemaVersion,
     });
     final response = await _client.put(
       uri,
@@ -72,8 +76,8 @@ class ApiClient {
     return (
       data: json['data'] as Map<String, dynamic>,
       crystals: json['crystals'] as int,
-      schemaVersion: json['schemaVersion'] as int,
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      schemaVersion: json['schema_version'] as int,
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 
