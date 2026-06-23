@@ -13,7 +13,6 @@ const int kDeckSize = 12;
 class MapNode {
   final int index;
   final String title;
-  final List<String> opponentCardIds;
   final DuelConfig opponentConfig;
   final bool isBoss;
   final bool isTraining;
@@ -22,7 +21,6 @@ class MapNode {
   const MapNode({
     required this.index,
     required this.title,
-    required this.opponentCardIds,
     required this.opponentConfig,
     this.isBoss = false,
     this.isTraining = false,
@@ -40,26 +38,22 @@ const kSliceNodes = <MapNode>[
   MapNode(
     index: 0,
     title: 'Тренировка',
-    opponentCardIds: ['fire_pie', 'nature_hedgehog', 'water_puddle', 'fire_deer'],
     opponentConfig: DuelConfig(startingCastleHp: 20),
     isTraining: true,
   ),
   MapNode(
     index: 1,
     title: 'Противник 1',
-    opponentCardIds: ['fire_rooster', 'nature_zucchini', 'water_jellyfish', 'nature_mushroom'],
     opponentConfig: DuelConfig(startingCastleHp: 28),
   ),
   MapNode(
     index: 2,
     title: 'Противник 2',
-    opponentCardIds: ['water_beaver', 'fire_phoenix_pearl', 'nature_mushroom', 'water_dumpling'],
     opponentConfig: DuelConfig(startingCastleHp: 34),
   ),
   MapNode(
     index: 3,
     title: 'БОСС: Тыквенный Лорд',
-    opponentCardIds: ['water_dumpling', 'fire_phoenix_pearl', 'water_beaver', 'trump_lava_cat'],
     opponentConfig: DuelConfig(startingCastleHp: 40),
     isBoss: true,
     rewardTrumpId: 'trump_pumpkin_king',
@@ -78,14 +72,61 @@ List<GameCard> padToDeck(List<GameCard> cards) {
   return deck;
 }
 
-/// Builds a 12-card deck from the player's owned cards. Trumps are placed first
-/// so owned козыри are always included (they live at the end of cards.json and
-/// would otherwise be cut off when padding to the deck size).
+/// The player's regular draw pile: owned NON-trump cards, padded to a full deck.
+/// Trumps are kept out (they live in [buildPlayerTrumps] as once-per-battle
+/// plays) so the 4-card hand is always regular cards.
 List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
-  final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
-  final trumps = owned.where((c) => c.rarity == Rarity.trump).toList();
-  final others = owned.where((c) => c.rarity != Rarity.trump).toList();
-  return padToDeck([...trumps, ...others]);
+  final owned = allCards
+      .where((c) => save.ownedCardIds.contains(c.id) && c.rarity != Rarity.trump)
+      .toList();
+  return padToDeck(owned);
+}
+
+/// The player's owned trumps — each usable once per battle.
+List<GameCard> buildPlayerTrumps(SaveState save, List<GameCard> allCards) {
+  return allCards
+      .where((c) => save.ownedCardIds.contains(c.id) && c.rarity == Rarity.trump)
+      .toList();
+}
+
+/// Builds an opponent deck weighted toward high power as the node [level] grows
+/// (training=0 → mostly weak; boss=3 → mostly strong). Card weight is
+/// `power^(1+level)`, so higher levels strongly favour stronger cards. The boss
+/// additionally gets a strong trump in its deck. Sampled with [random] so each
+/// battle deals different cards.
+List<GameCard> buildOpponentDeck({
+  required List<GameCard> allCards,
+  required int level,
+  required bool isBoss,
+  required Random random,
+  int size = kDeckSize,
+}) {
+  final pool = allCards.where((c) => c.rarity != Rarity.trump).toList();
+  final deck = <GameCard>[];
+  if (isBoss) {
+    final bossTrump =
+        allCards.where((c) => c.id == 'trump_lava_cat').toList();
+    deck.addAll(bossTrump);
+  }
+  if (pool.isEmpty) return deck;
+
+  final exp = 1 + level;
+  double weight(GameCard c) => pow(c.power.toDouble(), exp).toDouble();
+  final total = pool.fold<double>(0, (s, c) => s + weight(c));
+
+  while (deck.length < size) {
+    var r = random.nextDouble() * total;
+    var pick = pool.last;
+    for (final c in pool) {
+      r -= weight(c);
+      if (r <= 0) {
+        pick = c;
+        break;
+      }
+    }
+    deck.add(pick);
+  }
+  return deck;
 }
 
 class DuelReward {
@@ -148,15 +189,18 @@ DuelSession buildSession({
   required MapNode node,
   required Random random,
 }) {
-  final byId = {for (final c in allCards) c.id: c};
   final playerCards = buildPlayerDeck(save, allCards);
-  // Pad the opponent's themed card list up to a full deck so duels last as long
-  // as the player's (they no longer run out after a few rounds).
-  final oppCards =
-      padToDeck(node.opponentCardIds.map((id) => byId[id]!).toList());
+  final playerTrumps = buildPlayerTrumps(save, allCards);
+  final oppCards = buildOpponentDeck(
+    allCards: allCards,
+    level: node.level,
+    isBoss: node.isBoss,
+    random: random,
+  );
   return DuelSession(
     playerDeck: Deck(playerCards),
     opponentDeck: Deck(oppCards),
+    playerTrumps: playerTrumps,
     playerConfig: KingdomEconomy.toDuelConfig(save.kingdom),
     opponentConfig: node.opponentConfig,
     ai: AiController(),
