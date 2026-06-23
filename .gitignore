@@ -38,3 +38,5 @@ app.*.map.json
 
 # Superpowers SDD scratch (briefs, reports, diffs, ledger)
 .superpowers/
+
+help

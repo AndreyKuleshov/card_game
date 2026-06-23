@@ -29,6 +29,10 @@ class GameAssets {
   /// Wooden-plank table surface used as the duel background.
   static const String duelTable = 'assets/backgrounds/duel_table.png';
 
+  /// Full duel scene: table in perspective with the villain seated at the far
+  /// edge and the hero at the near edge. The table surface is the play area.
+  static const String duelLayout = 'assets/duel/duel_layout.png';
+
   // ── UI icons (replace inline emoji) ──────────────────────────────────────
   static const String iconCrystal = 'assets/icons/icon_crystal.png';
   static const String iconCastle = 'assets/icons/icon_castle.png';
@@ -49,9 +53,7 @@ class GameAssets {
         cardBack,
         castle,
         for (final t in BuildingType.values) building(t),
-        duelist(isOpponent: true),
-        duelist(isOpponent: false),
-        duelTable,
+        duelLayout,
         iconCrystal,
         iconCastle,
       ];
