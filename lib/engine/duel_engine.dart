@@ -5,14 +5,16 @@ import 'game_card.dart';
 class DuelConfig {
   final int startingCastleHp;
   final int handSize;
-  final Element? barracksElement;
-  final int barracksBonus;
+
+  /// Per-element power bonus from the player's elemental forges
+  /// (🔥 Зажигалка / 💧 Полторашка / 🌿 Травка). Applied to the player side for
+  /// a card whose element matches. Empty for opponents.
+  final Map<Element, int> elementBonuses;
 
   const DuelConfig({
     this.startingCastleHp = 30,
     this.handSize = 4,
-    this.barracksElement,
-    this.barracksBonus = 0,
+    this.elementBonuses = const {},
   });
 }
 
@@ -50,10 +52,8 @@ class DuelEngine {
     if (!opponentShifts && ElementRules.beats(card.element, opponentCard.element)) {
       power += kElementBonus;
     }
-    if (isPlayer &&
-        config.barracksElement != null &&
-        card.element == config.barracksElement) {
-      power += config.barracksBonus;
+    if (isPlayer) {
+      power += config.elementBonuses[card.element] ?? 0;
     }
     return power;
   }

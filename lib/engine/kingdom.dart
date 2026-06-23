@@ -1,29 +1,69 @@
 import 'duel_engine.dart';
 import 'element.dart';
 
-enum BuildingType { barracks, wall, mine }
+/// Kingdom buildings. Three elemental forges grant per-element power bonuses;
+/// the wall adds castle HP and the mine produces crystals.
+enum BuildingType {
+  fireForge, // 🔥 Зажигалка → бонус огню
+  waterWell, // 💧 Полторашка → бонус воде
+  natureGrove, // 🌿 Травка → бонус природе
+  wall, // 🧱 Стена → +ХП замка
+  mine, // ⛏️ Шахта → +кристаллы
+}
+
+/// The element a forge boosts, or null for non-forge buildings.
+Element? forgeElement(BuildingType type) {
+  switch (type) {
+    case BuildingType.fireForge:
+      return Element.fire;
+    case BuildingType.waterWell:
+      return Element.water;
+    case BuildingType.natureGrove:
+      return Element.nature;
+    case BuildingType.wall:
+    case BuildingType.mine:
+      return null;
+  }
+}
 
 class Kingdom {
-  final int barracksLevel;
+  final int fireLevel;
+  final int waterLevel;
+  final int natureLevel;
   final int wallLevel;
   final int mineLevel;
-  final Element barracksElement;
 
   const Kingdom({
-    this.barracksLevel = 0,
+    this.fireLevel = 0,
+    this.waterLevel = 0,
+    this.natureLevel = 0,
     this.wallLevel = 0,
     this.mineLevel = 0,
-    this.barracksElement = Element.fire,
   });
 
-  int get barracksBonus => barracksLevel; // 0/1/2/3 (level 0 = not built)
+  /// Power bonus a card of [element] gets from its matching forge (0/1/2/3).
+  int elementBonus(Element element) {
+    switch (element) {
+      case Element.fire:
+        return fireLevel;
+      case Element.water:
+        return waterLevel;
+      case Element.nature:
+        return natureLevel;
+    }
+  }
+
   int get wallHpBonus => wallLevel * 5; // 0/5/10/15
   int get mineCrystalsPerWin => mineLevel * 2; // 0/2/4/6
 
   int levelOf(BuildingType type) {
     switch (type) {
-      case BuildingType.barracks:
-        return barracksLevel;
+      case BuildingType.fireForge:
+        return fireLevel;
+      case BuildingType.waterWell:
+        return waterLevel;
+      case BuildingType.natureGrove:
+        return natureLevel;
       case BuildingType.wall:
         return wallLevel;
       case BuildingType.mine:
@@ -32,28 +72,34 @@ class Kingdom {
   }
 
   Kingdom upgraded(BuildingType type) {
-    int cap(int level) => level >= 3 ? 3 : level + 1;
+    final next = levelOf(type) >= 3 ? 3 : levelOf(type) + 1;
     switch (type) {
-      case BuildingType.barracks:
-        return copyWith(barracksLevel: cap(barracksLevel));
+      case BuildingType.fireForge:
+        return copyWith(fireLevel: next);
+      case BuildingType.waterWell:
+        return copyWith(waterLevel: next);
+      case BuildingType.natureGrove:
+        return copyWith(natureLevel: next);
       case BuildingType.wall:
-        return copyWith(wallLevel: cap(wallLevel));
+        return copyWith(wallLevel: next);
       case BuildingType.mine:
-        return copyWith(mineLevel: cap(mineLevel));
+        return copyWith(mineLevel: next);
     }
   }
 
   Kingdom copyWith({
-    int? barracksLevel,
+    int? fireLevel,
+    int? waterLevel,
+    int? natureLevel,
     int? wallLevel,
     int? mineLevel,
-    Element? barracksElement,
   }) {
     return Kingdom(
-      barracksLevel: barracksLevel ?? this.barracksLevel,
+      fireLevel: fireLevel ?? this.fireLevel,
+      waterLevel: waterLevel ?? this.waterLevel,
+      natureLevel: natureLevel ?? this.natureLevel,
       wallLevel: wallLevel ?? this.wallLevel,
       mineLevel: mineLevel ?? this.mineLevel,
-      barracksElement: barracksElement ?? this.barracksElement,
     );
   }
 }
@@ -79,8 +125,11 @@ class KingdomEconomy {
   static DuelConfig toDuelConfig(Kingdom k) {
     return DuelConfig(
       startingCastleHp: 30 + k.wallHpBonus,
-      barracksElement: k.barracksElement,
-      barracksBonus: k.barracksBonus,
+      elementBonuses: {
+        Element.fire: k.fireLevel,
+        Element.water: k.waterLevel,
+        Element.nature: k.natureLevel,
+      },
     );
   }
 }
