@@ -86,7 +86,7 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
           save: save,
           allCards: allCards,
           node: widget.node,
-          random: Random(widget.node.index + 1),
+          random: Random(), // fresh shuffle → a different deal every battle
         );
         return _buildTable(session);
       },
@@ -138,24 +138,36 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
                     alignment: const Alignment(0, -0.45),
                     child: _FaceDownHand(count: session.opponentHand.length),
                   ),
-                  // Clash / play area — open table surface (upper-middle).
+                  // Clash / play area — shows the opponent's pending card to
+                  // answer (idle) or the clash result (after responding).
                   Align(
                     alignment: const Alignment(0, -0.19),
                     child: _BattleZone(
                       result: _lastResult,
+                      pendingOpponentCard: session.pendingOpponentCard,
                       showReveal: _showReveal,
                       playerCardSlide: _playerCardSlide,
                       opponentCardSlide: _opponentCardSlide,
                       clashProgress: _clashProgress,
                     ),
                   ),
+                  // Player trumps — once-per-battle, just above the hand.
+                  if (session.availableTrumps.isNotEmpty)
+                    Align(
+                      alignment: const Alignment(0, 0.5),
+                      child: _TrumpRow(
+                        trumps: session.availableTrumps,
+                        resolved: _resolved || _animating,
+                        onTap: (card) => _respond(card, session),
+                      ),
+                    ),
                   // Player hand — low, in front of the hero (below his head).
                   Align(
                     alignment: const Alignment(0, 0.82),
                     child: _PlayerHand(
                       hand: session.playerHand,
                       resolved: _resolved || _animating,
-                      onCardTap: (card) => _play(card, session),
+                      onCardTap: (card) => _respond(card, session),
                     ),
                   ),
                   // Player HP — pinned to the very bottom.
@@ -179,10 +191,10 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
     );
   }
 
-  void _play(GameCard card, DuelSession session) {
+  void _respond(GameCard card, DuelSession session) {
     if (_animating || _resolved) return;
 
-    final result = session.playPlayerCard(card);
+    final result = session.respond(card);
     setState(() {
       _lastResult = result;
       _showReveal = false;
@@ -207,8 +219,15 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
             if (mounted) _finish(outcome == DuelOutcome.playerWon);
           });
         } else {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) setState(() => _animating = false);
+          // Let the player read the result, then advance to the opponent's
+          // next card (clearing the result reveals the new pending card).
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            if (mounted) {
+              setState(() {
+                _lastResult = null;
+                _animating = false;
+              });
+            }
           });
         }
       });
@@ -273,6 +292,7 @@ class _FaceDownHand extends StatelessWidget {
 
 class _BattleZone extends StatelessWidget {
   final RoundResult? result;
+  final GameCard? pendingOpponentCard;
   final bool showReveal;
   final Animation<double> playerCardSlide;
   final Animation<double> opponentCardSlide;
@@ -280,6 +300,7 @@ class _BattleZone extends StatelessWidget {
 
   const _BattleZone({
     required this.result,
+    required this.pendingOpponentCard,
     required this.showReveal,
     required this.playerCardSlide,
     required this.opponentCardSlide,
@@ -289,26 +310,34 @@ class _BattleZone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (result == null) {
-      // Idle: a defined "table" play area where cards will clash. Returned
-      // unwrapped (no Center) so the parent Align controls its position.
-      return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
-          decoration: BoxDecoration(
-            color: Colors.black.withAlpha(36),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withAlpha(70), width: 2),
-          ),
-          child: const Text(
-            'Выбери карту,\nчтобы атаковать',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
+      // Idle: the opponent has played a card — show it face-up for the player
+      // to answer. Returned unwrapped (no Center) so the parent Align places it.
+      final pending = pendingOpponentCard;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (pending != null)
+            GameCardView(card: pending, width: 84)
+          else
+            const SizedBox.shrink(),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(110),
+              borderRadius: BorderRadius.circular(10),
             ),
-            textAlign: TextAlign.center,
+            child: const Text(
+              'Ответь картой',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
+        ],
       );
     }
 
@@ -594,6 +623,45 @@ class _PlayerHand extends StatelessWidget {
                 card: card,
                 width: 76,
                 onTap: resolved ? null : () => onCardTap(card),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _TrumpRow — owned trumps, each playable once per battle (as the round answer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TrumpRow extends StatelessWidget {
+  final List<GameCard> trumps;
+  final bool resolved;
+  final void Function(GameCard) onTap;
+
+  const _TrumpRow({
+    required this.trumps,
+    required this.resolved,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final card in trumps)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: GameCardView(
+                card: card,
+                width: 60,
+                highlighted: true,
+                onTap: resolved ? null : () => onTap(card),
               ),
             ),
         ],

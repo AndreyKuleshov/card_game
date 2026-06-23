@@ -6,6 +6,9 @@ import 'game_card.dart';
 
 enum DuelOutcome { playerWon, opponentWon, ongoing }
 
+/// Turn-based duel: the opponent reveals a card first ([pendingOpponentCard]),
+/// then the player answers with one card via [respond] — a card from the 4-card
+/// hand OR one of the [availableTrumps] (each trump usable once per battle).
 class DuelSession {
   final Deck _playerDeck;
   final Deck _opponentDeck;
@@ -16,6 +19,9 @@ class DuelSession {
 
   final List<GameCard> _playerHand = [];
   final List<GameCard> _opponentHand = [];
+  final List<GameCard> _trumps = []; // each usable once per battle
+
+  GameCard? _pendingOpponentCard;
 
   late int playerCastleHp;
   late int opponentCastleHp;
@@ -23,15 +29,25 @@ class DuelSession {
   DuelSession({
     required Deck playerDeck,
     required Deck opponentDeck,
+    required List<GameCard> playerTrumps,
     required this.playerConfig,
     required this.opponentConfig,
     required this.ai,
     required this.random,
   })  : _playerDeck = playerDeck,
-        _opponentDeck = opponentDeck;
+        _opponentDeck = opponentDeck {
+    _trumps.addAll(playerTrumps);
+  }
 
   List<GameCard> get playerHand => List.unmodifiable(_playerHand);
   List<GameCard> get opponentHand => List.unmodifiable(_opponentHand);
+
+  /// Owned trumps not yet spent this battle. Each can be played once via
+  /// [respond]; they return next battle (the session is rebuilt from scratch).
+  List<GameCard> get availableTrumps => List.unmodifiable(_trumps);
+
+  /// The card the opponent has played and the player must answer.
+  GameCard? get pendingOpponentCard => _pendingOpponentCard;
 
   void start() {
     _playerDeck.shuffle(random);
@@ -40,12 +56,23 @@ class DuelSession {
     opponentCastleHp = opponentConfig.startingCastleHp;
     _playerHand.clear();
     _opponentHand.clear();
-    _refill();
-  }
-
-  void _refill() {
     _fill(_playerDeck, _playerHand, playerConfig.handSize);
     _fill(_opponentDeck, _opponentHand, opponentConfig.handSize);
+    _revealOpponentCard();
+  }
+
+  // Opponent leads each round: top the reserve back up to a full hand, then
+  // pick a card to reveal. With recycling the deck never empties, so there is
+  // always one card on the table plus `handSize - 1` in reserve.
+  void _revealOpponentCard() {
+    _fill(_opponentDeck, _opponentHand, opponentConfig.handSize);
+    if (_opponentHand.isEmpty) {
+      _pendingOpponentCard = null;
+      return;
+    }
+    final c = ai.chooseCard(hand: _opponentHand, config: opponentConfig);
+    _opponentHand.remove(c);
+    _pendingOpponentCard = c;
   }
 
   // Draw up to [handSize], reshuffling the deck when it empties so cards never
@@ -62,13 +89,17 @@ class DuelSession {
     }
   }
 
-  RoundResult playPlayerCard(GameCard card) {
-    _playerHand.remove(card);
-    final oppCard = ai.chooseCard(hand: _opponentHand, config: opponentConfig);
-    _opponentHand.remove(oppCard);
+  /// Player answers [pendingOpponentCard] with [card] (a hand card or a trump).
+  /// Resolves the clash, applies castle damage, consumes the card (hand refills
+  /// to 4; a trump is spent for the battle), then the opponent reveals its next
+  /// card. Returns the resolved round (player perspective).
+  RoundResult respond(GameCard card) {
+    final oppCard = _pendingOpponentCard!;
+    final wasTrump = _trumps.remove(card); // GameCard equality is by id
+    if (!wasTrump) {
+      _playerHand.remove(card);
+    }
 
-    // Single authoritative resolution from the player's perspective so the
-    // returned RoundResult and the castle-damage attribution never disagree.
     final result = DuelEngine.resolveRound(
         playerCard: card, opponentCard: oppCard, config: playerConfig);
     if (result.winner == RoundWinner.player) {
@@ -76,7 +107,11 @@ class DuelSession {
     } else if (result.winner == RoundWinner.opponent) {
       playerCastleHp -= result.damage;
     }
-    _refill();
+
+    if (!wasTrump) {
+      _fill(_playerDeck, _playerHand, playerConfig.handSize);
+    }
+    _revealOpponentCard();
     return result;
   }
 
