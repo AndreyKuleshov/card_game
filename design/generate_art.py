@@ -51,7 +51,7 @@ def make_ssl_context(insecure):
         return ssl.create_default_context()
 
 
-SSL_CTX = ssl.create_default_context()  # переопределяется в main()
+_ssl_ctx = ssl.create_default_context()  # переопределяется в main()
 
 
 def load_dotenv():
@@ -208,7 +208,7 @@ def gen_pollinations(prompt, w, h, seed):
         f"?width={w}&height={h}&seed={seed}&model=flux&nologo=true&private=true"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "card-game-art/1.0"})
-    with urllib.request.urlopen(req, timeout=180, context=SSL_CTX) as r:
+    with urllib.request.urlopen(req, timeout=180, context=_ssl_ctx) as r:
         return r.read()
 
 
@@ -237,7 +237,7 @@ def gen_gemini(prompt, ref_b64=None):
         url, data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"}, method="POST",
     )
-    with urllib.request.urlopen(req, timeout=180, context=SSL_CTX) as r:
+    with urllib.request.urlopen(req, timeout=180, context=_ssl_ctx) as r:
         resp = json.loads(r.read())
     for part in resp["candidates"][0]["content"]["parts"]:
         if "inlineData" in part:
@@ -258,8 +258,8 @@ def main():
     args = ap.parse_args()
 
     load_dotenv()
-    global SSL_CTX
-    SSL_CTX = make_ssl_context(args.insecure)
+    global _ssl_ctx
+    _ssl_ctx = make_ssl_context(args.insecure)
 
     ref_b64 = None
     if args.ref:

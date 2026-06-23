@@ -56,7 +56,7 @@ def remove_bg(path, tolerance, expand, keep):
     candidate = dist <= tolerance
 
     # Связные компоненты кандидатов; оставляем только те, что касаются краёв.
-    labels, n = ndimage.label(candidate)
+    labels, _ = ndimage.label(candidate)  # pyright: ignore[reportGeneralTypeIssues]
     border = set(labels[0, :]) | set(labels[-1, :]) | set(labels[:, 0]) | set(labels[:, -1])
     border.discard(0)
     bg_mask = np.isin(labels, list(border))
