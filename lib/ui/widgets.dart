@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../engine/ability.dart';
 import '../engine/game_card.dart';
+import 'game_assets.dart';
 import 'theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,28 +71,38 @@ class GameCardView extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 28),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Element emoji
-                Text(
-                  GameColors.elementEmoji(card.element),
-                  style: TextStyle(fontSize: width * 0.28),
-                  textAlign: TextAlign.center,
-                ),
-                // Card name — FittedBox prevents overflow
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      card.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
+                // Card artwork — falls back to the element emoji if missing.
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(GameColors.cardRadius - 6),
+                    child: Image.asset(
+                      GameAssets.card(card.id),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, _, _) => Center(
+                        child: Text(
+                          GameColors.elementEmoji(card.element),
+                          style: TextStyle(fontSize: width * 0.32),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      maxLines: 3,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Card name — FittedBox prevents overflow
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    card.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
                   ),
                 ),
               ],
@@ -187,10 +198,13 @@ class CardBack extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Text(
-          '🛡️',
-          style: TextStyle(fontSize: width * 0.36),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(
+        GameAssets.cardBack,
+        fit: BoxFit.cover,
+        // Fall back to the shield emoji on the gradient if the asset is missing.
+        errorBuilder: (_, _, _) => Center(
+          child: Text('🛡️', style: TextStyle(fontSize: width * 0.36)),
         ),
       ),
     );
@@ -225,7 +239,13 @@ class HpBar extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text('🏰', style: TextStyle(fontSize: 14)),
+            Image.asset(
+              GameAssets.iconCastle,
+              width: 16,
+              height: 16,
+              errorBuilder: (_, _, _) =>
+                  const Text('🏰', style: TextStyle(fontSize: 14)),
+            ),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -289,13 +309,26 @@ class CrystalChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(GameColors.chipRadius),
         border: Border.all(color: const Color(0xFF90CAF9)),
       ),
-      child: Text(
-        '💎 $amount',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1565C0),
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            GameAssets.iconCrystal,
+            width: 16,
+            height: 16,
+            errorBuilder: (_, _, _) =>
+                const Text('💎', style: TextStyle(fontSize: 14)),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$amount',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1565C0),
+            ),
+          ),
+        ],
       ),
     );
   }

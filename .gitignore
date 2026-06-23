@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+.env
 .atom/
 .buildlog/
 .history
@@ -37,3 +38,5 @@ app.*.map.json
 
 # Superpowers SDD scratch (briefs, reports, diffs, ledger)
 .superpowers/
+
+help

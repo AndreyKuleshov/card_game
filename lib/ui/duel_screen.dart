@@ -7,8 +7,8 @@ import '../engine/duel_session.dart';
 import '../engine/element.dart';
 import '../engine/game_card.dart';
 import '../state/providers.dart';
-import 'art.dart';
 import 'duel_setup.dart';
+import 'game_assets.dart';
 import 'reward_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -97,41 +97,83 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
     return Scaffold(
       appBar: AppBar(title: Text(widget.node.title)),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: GameColors.tabletopStops,
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Column(
-              children: [
-                // ── TOP: opponent ─────────────────────────────────────
-                _OpponentZone(session: session),
-                const SizedBox(height: 8),
-                // ── CENTER: battle result ─────────────────────────────
-                Expanded(
-                  child: _BattleZone(
-                    result: _lastResult,
-                    showReveal: _showReveal,
-                    playerCardSlide: _playerCardSlide,
-                    opponentCardSlide: _opponentCardSlide,
-                    clashProgress: _clashProgress,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // ── BOTTOM: player ────────────────────────────────────
-                _PlayerZone(
-                  session: session,
-                  resolved: _resolved || _animating,
-                  onCardTap: (card) => _play(card, session),
-                ),
-              ],
+        // Solid backdrop behind the scene (fills any transparent/letterboxed area).
+        color: const Color(0xFF14110E),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Duel scene: table with both duelists baked in. The table surface
+            // is the play area; UI overlays on top of it.
+            Image.asset(
+              GameAssets.duelLayout,
+              fit: BoxFit.cover,
+              // Nudge the scene slightly right (shows a bit more of the left crop).
+              alignment: const Alignment(-0.045, 0),
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
-          ),
+            // Overlays positioned by fraction of height so they land on the
+            // baked scene: HP at the edges, the villain's cards on the upper
+            // table, the clash at the table centre, the player's hand on the
+            // lower table (in front of the hero).
+            SafeArea(
+              // expand so the fractional Aligns and edge-pinned HP bars resolve
+              // against the full screen (not a collapsed stack).
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Opponent HP — pinned to the very top.
+                  Positioned(
+                    top: 4,
+                    left: 12,
+                    right: 12,
+                    child: HpBar(
+                      current: session.opponentCastleHp,
+                      max: session.opponentConfig.startingCastleHp,
+                      label: 'Замок врага',
+                      color: const Color(0xFFE53935),
+                    ),
+                  ),
+                  // Opponent face-down hand — on the table in front of the villain.
+                  Align(
+                    alignment: const Alignment(0, -0.45),
+                    child: _FaceDownHand(count: session.opponentHand.length),
+                  ),
+                  // Clash / play area — open table surface (upper-middle).
+                  Align(
+                    alignment: const Alignment(0, -0.19),
+                    child: _BattleZone(
+                      result: _lastResult,
+                      showReveal: _showReveal,
+                      playerCardSlide: _playerCardSlide,
+                      opponentCardSlide: _opponentCardSlide,
+                      clashProgress: _clashProgress,
+                    ),
+                  ),
+                  // Player hand — low, in front of the hero (below his head).
+                  Align(
+                    alignment: const Alignment(0, 0.82),
+                    child: _PlayerHand(
+                      hand: session.playerHand,
+                      resolved: _resolved || _animating,
+                      onCardTap: (card) => _play(card, session),
+                    ),
+                  ),
+                  // Player HP — pinned to the very bottom.
+                  Positioned(
+                    bottom: 4,
+                    left: 12,
+                    right: 12,
+                    child: HpBar(
+                      current: session.playerCastleHp,
+                      max: session.playerConfig.startingCastleHp,
+                      label: 'Твой замок',
+                      color: const Color(0xFF1565C0),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -198,49 +240,29 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Opponent zone — HP bar + face-down hand
+// Opponent face-down hand — laid on the upper table in front of the villain
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _OpponentZone extends StatelessWidget {
-  final DuelSession session;
+class _FaceDownHand extends StatelessWidget {
+  final int count;
 
-  const _OpponentZone({required this.session});
+  const _FaceDownHand({required this.count});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const DuelistPainterView(isOpponent: true, size: 44),
-            const SizedBox(width: 8),
-            Expanded(
-              child: HpBar(
-                current: session.opponentCastleHp,
-                max: session.opponentConfig.startingCastleHp,
-                label: 'Замок врага',
-                color: const Color(0xFFE53935),
-              ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < count; i++)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 3),
+              child: CardBack(width: 46),
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // Opponent hand as face-down cards
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final _ in session.opponentHand)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: CardBack(width: 52),
-                ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -267,16 +289,26 @@ class _BattleZone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (result == null) {
-      return const Center(
-        child: Text(
-          'Выбери карту, чтобы атаковать',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+      // Idle: a defined "table" play area where cards will clash. Returned
+      // unwrapped (no Center) so the parent Align controls its position.
+      return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(36),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withAlpha(70), width: 2),
           ),
-          textAlign: TextAlign.center,
-        ),
+          child: const Text(
+            'Выбери карту,\nчтобы атаковать',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
       );
     }
 
@@ -340,6 +372,7 @@ class _BattleZone extends StatelessWidget {
     // We map it through a "lunge then return" curve: sin(π*t) for [0..1].
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Stack(
@@ -532,58 +565,39 @@ class _BattleZone extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Player zone — HP bar + tappable hand
+// Player hand — tappable cards laid on the lower table in front of the hero
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _PlayerZone extends StatelessWidget {
-  final DuelSession session;
+class _PlayerHand extends StatelessWidget {
+  final List<GameCard> hand;
   final bool resolved;
   final void Function(GameCard) onCardTap;
 
-  const _PlayerZone({
-    required this.session,
+  const _PlayerHand({
+    required this.hand,
     required this.resolved,
     required this.onCardTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const DuelistPainterView(isOpponent: false, size: 44),
-            const SizedBox(width: 8),
-            Expanded(
-              child: HpBar(
-                current: session.playerCastleHp,
-                max: session.playerConfig.startingCastleHp,
-                label: 'Твой замок',
-                color: const Color(0xFF1565C0),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final card in hand)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: GameCardView(
+                card: card,
+                width: 76,
+                onTap: resolved ? null : () => onCardTap(card),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final card in session.playerHand)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: GameCardView(
-                    card: card,
-                    width: 80,
-                    onTap: resolved ? null : () => onCardTap(card),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

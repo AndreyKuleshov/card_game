@@ -170,40 +170,54 @@ class _VillageScene extends StatelessWidget {
             final w = constraints.maxWidth;
             final h = constraints.maxHeight;
 
-            // Castle centred slightly above middle — a little bigger now.
-            final castleSize = (w * 0.26).clamp(72.0, 130.0);
+            // Castle sits in the centre of the kingdom.
+            final castleSize = (w * 0.24).clamp(64.0, 120.0);
 
             // Building widget size — scales with scene width.
-            final bldSize = (w * 0.15).clamp(44.0, 70.0);
+            final bldSize = (w * 0.14).clamp(44.0, 64.0);
+            final gateColW = bldSize + 8;
 
-            // Positions for 5 buildings — no overlap, fits 360–600px wide.
-            // Front row: fireForge(left), natureGrove(center), waterWell(right)
-            // Sides: wall(far-left), mine(far-right)
+            // Buildings live INSIDE the surrounding wall. The 3 forges are
+            // scattered (positions are intentionally loose); the mine sits to
+            // one side; the wall is the gate at the bottom-centre.
             final positions = {
-              BuildingType.wall: Offset(w * 0.01, h * 0.38),
-              BuildingType.fireForge: Offset(w * 0.16, h * 0.53),
-              BuildingType.natureGrove: Offset(w * 0.41, h * 0.57),
-              BuildingType.waterWell: Offset(w * 0.64, h * 0.53),
-              BuildingType.mine: Offset(w * 0.80, h * 0.38),
+              BuildingType.mine: Offset(w * 0.72, h * 0.46),
+              BuildingType.fireForge: Offset(w * 0.07, h * 0.50),
+              BuildingType.natureGrove: Offset(w * 0.10, h * 0.72),
+              BuildingType.waterWell: Offset(w * 0.70, h * 0.72),
+              BuildingType.wall: Offset(w * 0.50 - gateColW / 2, h * 0.80),
             };
 
             return Stack(
               clipBehavior: Clip.hardEdge,
               children: [
-                // Castle at centre/back.
+                // Wall surrounding the whole kingdom — decorative perimeter that
+                // reflects the wall level. Tap the gate (bottom-centre) to build
+                // or upgrade it.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _WallFramePainter(
+                        kingdom.levelOf(BuildingType.wall),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Castle in the centre.
                 Positioned(
                   left: w / 2 - castleSize / 2,
-                  top: h * 0.04,
+                  top: h * 0.46 - castleSize / 2,
                   child: CastlePainterView(size: castleSize),
                 ),
 
-                // Buildings — render in z-order (back first).
+                // Scattered buildings + the wall gate.
                 for (final type in [
-                  BuildingType.wall,
                   BuildingType.mine,
                   BuildingType.fireForge,
-                  BuildingType.waterWell,
                   BuildingType.natureGrove,
+                  BuildingType.waterWell,
+                  BuildingType.wall,
                 ])
                   _PositionedBuilding(
                     type: type,
@@ -268,58 +282,8 @@ class _MeadowPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
     canvas.drawRect(Rect.fromLTWH(0, h * 0.34, w, h * 0.08), horizonPaint);
 
-    // ── Dirt road network ─────────────────────────────────────────────────────
-    final castleCX = w * 0.50;
-    final castleCY = h * 0.28;
-
-    final pathPaint = Paint()
-      ..color = const Color(0xFFD4A96A).withAlpha(210)
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    // Roads to each building
-    pathPaint.strokeWidth = w * 0.038;
-
-    // To wall (far left)
-    _drawRoadSegment(canvas, pathPaint,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.18, h * 0.36),
-        end: Offset(w * 0.08, h * 0.48));
-
-    // To fireForge (left-center)
-    _drawRoadSegment(canvas, pathPaint,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.30, h * 0.40),
-        end: Offset(w * 0.23, h * 0.60));
-
-    // To natureGrove (center-front)
-    _drawRoadSegment(canvas, pathPaint,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.50, h * 0.46),
-        end: Offset(w * 0.50, h * 0.64));
-
-    // To waterWell (right-center)
-    _drawRoadSegment(canvas, pathPaint,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.70, h * 0.40),
-        end: Offset(w * 0.77, h * 0.60));
-
-    // To mine (far right)
-    _drawRoadSegment(canvas, pathPaint,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.82, h * 0.36),
-        end: Offset(w * 0.87, h * 0.48));
-
-    // Road highlight stripes
-    final pathHighlight = Paint()
-      ..color = const Color(0xFFEDD08A).withAlpha(120)
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.014;
-    _drawRoadSegment(canvas, pathHighlight,
-        start: Offset(castleCX, castleCY),
-        ctrl: Offset(w * 0.50, h * 0.46),
-        end: Offset(w * 0.50, h * 0.64));
+    // Roads removed: the castle now sits in the centre, surrounded by a wall,
+    // so radiating paths no longer make sense.
 
     // ── Small pond (lower-right corner) ──────────────────────────────────────
     _drawPond(canvas, w * 0.88, h * 0.82, w * 0.07, h * 0.045);
@@ -369,19 +333,6 @@ class _MeadowPainter extends CustomPainter {
     canvas.drawCircle(Offset(cx + r * 0.8, cy + r * 0.15), r * 0.75, paint);
     canvas.drawCircle(Offset(cx - r * 0.7, cy + r * 0.20), r * 0.65, paint);
     canvas.drawCircle(Offset(cx + r * 0.3, cy + r * 0.35), r * 0.70, paint);
-  }
-
-  void _drawRoadSegment(
-    Canvas canvas,
-    Paint paint, {
-    required Offset start,
-    required Offset ctrl,
-    required Offset end,
-  }) {
-    final path = Path()
-      ..moveTo(start.dx, start.dy)
-      ..quadraticBezierTo(ctrl.dx, ctrl.dy, end.dx, end.dy);
-    canvas.drawPath(path, paint);
   }
 
   void _drawPond(Canvas canvas, double cx, double cy, double rx, double ry) {
@@ -504,6 +455,117 @@ class _MeadowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _WallFramePainter — stone wall surrounding the whole kingdom
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Draws a crenellated stone wall around the kingdom perimeter. Appearance
+/// scales with the wall [level]: level 0 is a faint dashed "build here" outline;
+/// 1–3 grow thicker and more solid. Decorative only — the tappable gate is a
+/// separate building widget.
+class _WallFramePainter extends CustomPainter {
+  final int level;
+
+  const _WallFramePainter(this.level);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // The wall hugs the meadow region (which starts ~34% down) with a margin.
+    final inset = w * 0.025;
+    final rect = Rect.fromLTRB(inset, h * 0.40, w - inset, h - inset);
+    final radius = Radius.circular(w * 0.05);
+    final rr = RRect.fromRectAndRadius(rect, radius);
+
+    if (level == 0) {
+      // Not built yet — faint dashed outline.
+      final dash = Paint()
+        ..color = Colors.white.withAlpha(120)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      _drawDashedRRect(canvas, rr, dash, dashLen: 10, gapLen: 8);
+      return;
+    }
+
+    final band = 6.0 + level * 4.0; // thicker wall at higher levels
+
+    // Stone body.
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..color = const Color(0xFFCBB8A6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = band,
+    );
+    // Darker outline for depth.
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..color = const Color(0xFF8D7B6B)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+
+    // Crenellations (merlons) along the top edge.
+    final merlonPaint = Paint()..color = const Color(0xFFB8A48F);
+    final merlonW = w * 0.045;
+    final mh = band * 0.9;
+    final topY = rect.top - mh / 2;
+    final startX = rect.left + w * 0.07;
+    final endX = rect.right - w * 0.07;
+    final step = merlonW * 2.0;
+    for (double x = startX; x <= endX - merlonW; x += step) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, topY, merlonW, mh),
+          const Radius.circular(2),
+        ),
+        merlonPaint,
+      );
+    }
+
+    // Corner towers.
+    final towerPaint = Paint()..color = const Color(0xFFCBB8A6);
+    final towerEdge = Paint()
+      ..color = const Color(0xFF8D7B6B)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    final tr = band * 0.95;
+    for (final c in [
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomLeft,
+      rect.bottomRight,
+    ]) {
+      canvas.drawCircle(c, tr, towerPaint);
+      canvas.drawCircle(c, tr, towerEdge);
+    }
+  }
+
+  void _drawDashedRRect(
+    Canvas canvas,
+    RRect rr,
+    Paint paint, {
+    required double dashLen,
+    required double gapLen,
+  }) {
+    final path = Path()..addRRect(rr);
+    for (final metric in path.computeMetrics()) {
+      double dist = 0;
+      while (dist < metric.length) {
+        final next = dist + dashLen;
+        canvas.drawPath(metric.extractPath(dist, next), paint);
+        dist = next + gapLen;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WallFramePainter oldDelegate) =>
+      oldDelegate.level != level;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
