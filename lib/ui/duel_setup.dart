@@ -16,6 +16,7 @@ class MapNode {
   final List<String> opponentCardIds;
   final DuelConfig opponentConfig;
   final bool isBoss;
+  final bool isTraining;
   final String? rewardTrumpId;
 
   const MapNode({
@@ -24,9 +25,16 @@ class MapNode {
     required this.opponentCardIds,
     required this.opponentConfig,
     this.isBoss = false,
+    this.isTraining = false,
     this.rewardTrumpId,
   });
+
+  /// Opponent tier used for rewards: Противник 1 → 1, Противник 2 → 2, …
+  int get level => index;
 }
+
+/// Index of the boss node (last in [kSliceNodes]).
+int get kBossNodeIndex => kSliceNodes.length - 1;
 
 const kSliceNodes = <MapNode>[
   MapNode(
@@ -34,6 +42,7 @@ const kSliceNodes = <MapNode>[
     title: 'Тренировка',
     opponentCardIds: ['fire_pie', 'nature_hedgehog', 'water_puddle', 'fire_deer'],
     opponentConfig: DuelConfig(startingCastleHp: 20),
+    isTraining: true,
   ),
   MapNode(
     index: 1,
@@ -91,11 +100,16 @@ class DuelReward {
 }
 
 /// Pure computation of what a finished duel grants.
-/// Mirrors the slice rules: crystals = 5 + mine bonus; unlock the next node
-/// only when this node is the current frontier and not the last; a boss grants
-/// its rewardTrumpId; a non-boss win rolls a ~30% chest for a trump.
-/// Pass a caller-owned [random] so chest drops are genuinely random in
-/// production and deterministically reproducible in tests.
+///
+/// Base crystals by node type, plus the mine bonus on every win:
+///   • тренировка        → 5            (repeatable, no trump chest)
+///   • противник (lvl L)  → 10 + 5·L     (+30% trump chest)
+///   • босс              → 30           (+ guaranteed rewardTrumpId)
+///
+/// [unlockNext] advances the frontier only when beating the *current* opponent
+/// (the node at the frontier, excluding the boss and training). Pass a
+/// caller-owned [random] so chest drops are random in production and
+/// deterministic in tests.
 DuelReward computeDuelReward({
   required MapNode node,
   required SaveState save,
@@ -103,14 +117,27 @@ DuelReward computeDuelReward({
   required Random random,
 }) {
   if (!won) return const DuelReward(crystalsEarned: 0, unlockNext: false);
-  final earned = 5 + save.kingdom.mineCrystalsPerWin;
-  final unlockNext =
-      node.index >= save.unlockedNodeIndex && node.index < kSliceNodes.length - 1;
+
+  final int base;
+  if (node.isTraining) {
+    base = 5;
+  } else if (node.isBoss) {
+    base = 30;
+  } else {
+    base = 10 + 5 * node.level;
+  }
+  final earned = base + save.kingdom.mineCrystalsPerWin;
+
+  // Advance only when this is the current opponent (frontier, non-boss).
+  final unlockNext = !node.isTraining &&
+      !node.isBoss &&
+      node.index == save.unlockedNodeIndex;
+
   String? trump;
   if (node.rewardTrumpId != null) {
-    trump = node.rewardTrumpId;
-  } else if (random.nextDouble() < 0.30) {
-    trump = 'trump_frost_granny';
+    trump = node.rewardTrumpId; // boss
+  } else if (!node.isTraining && !node.isBoss && random.nextDouble() < 0.30) {
+    trump = 'trump_frost_granny'; // opponent chest
   }
   return DuelReward(crystalsEarned: earned, unlockNext: unlockNext, trumpGranted: trump);
 }

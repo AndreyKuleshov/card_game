@@ -37,6 +37,16 @@ class GameAssets {
   static const String iconCrystal = 'assets/icons/icon_crystal.png';
   static const String iconCastle = 'assets/icons/icon_castle.png';
 
+  // ── World-map markers ─────────────────────────────────────────────────────
+  /// Distinct enemy marker per opponent tier (enemy_1, enemy_2, …); higher
+  /// tiers fall back to the last available icon.
+  static String enemy(int level) => 'assets/map/enemy_${level.clamp(1, 2)}.png';
+
+  /// Training and boss markers.
+  static const String mapTraining = 'assets/map/node_training.png';
+  static const String mapBoss = 'assets/map/node_boss.png';
+  static const String mapLocked = 'assets/map/node_locked.png';
+
   /// All card ids (keep in sync with assets/cards.json).
   static const List<String> _cardIds = [
     'fire_deer', 'fire_rooster', 'fire_pie', 'fire_phoenix_pearl',
@@ -56,5 +66,10 @@ class GameAssets {
         duelLayout,
         iconCrystal,
         iconCastle,
+        enemy(1),
+        enemy(2),
+        mapTraining,
+        mapBoss,
+        mapLocked,
       ];
 }

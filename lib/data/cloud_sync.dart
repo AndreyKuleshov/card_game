@@ -33,7 +33,8 @@ class CloudSync {
 
     try {
       final remote = await _api.getProgress(token);
-      if (remote == null) return local;
+      // null = 404; empty data = the server's "no saved progress yet" 200.
+      if (remote == null || remote.data.isEmpty) return local;
 
       final localUpdatedAtMs = prefs.getInt(_keyLocalUpdatedAt);
       final localUpdatedAt = localUpdatedAtMs != null

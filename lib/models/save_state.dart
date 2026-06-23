@@ -23,7 +23,9 @@ class SaveState {
         crystals: 0,
         kingdom: const Kingdom(),
         ownedCardIds: {..._starterCommonIds, 'trump_starter_drake'},
-        unlockedNodeIndex: 0,
+        // Frontier starts at the first opponent (index 1); training (index 0)
+        // is always available and does not move the frontier.
+        unlockedNodeIndex: 1,
       );
 
   SaveState copyWith({
@@ -65,7 +67,10 @@ class SaveState {
         mineLevel: k['mineLevel'] as int,
       ),
       ownedCardIds: (json['ownedCardIds'] as List<dynamic>).cast<String>().toSet(),
-      unlockedNodeIndex: json['unlockedNodeIndex'] as int,
+      // Migrate old saves where the frontier started at 0 (training).
+      unlockedNodeIndex: (json['unlockedNodeIndex'] as int) < 1
+          ? 1
+          : json['unlockedNodeIndex'] as int,
     );
   }
 }
