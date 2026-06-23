@@ -1,0 +1,111 @@
+# Review package: 49c6ac5..878c98a63770b96d6ca6969930953d1275d15d72
+
+## Commits
+878c98a feat: add ability, rarity, and GameCard models
+
+## Files changed
+ lib/engine/ability.dart         | 14 ++++++++++++++
+ lib/engine/game_card.dart       | 29 +++++++++++++++++++++++++++++
+ test/engine/game_card_test.dart | 38 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 81 insertions(+)
+
+## Diff
+diff --git a/lib/engine/ability.dart b/lib/engine/ability.dart
+new file mode 100644
+index 0000000..ee3f4f0
+--- /dev/null
++++ b/lib/engine/ability.dart
+@@ -0,0 +1,14 @@
++/// Trump-card abilities used in the vertical slice.
++enum Ability {
++  /// Ignore the opponent's element bonus this round.
++  elementalShift,
++
++  /// Deal x1.5 damage (floored) on a won round.
++  doubleStrike,
++
++  /// Take no castle damage on a lost round.
++  shield,
++}
++
++/// Card rarity tiers.
++enum Rarity { common, rare, trump }
+diff --git a/lib/engine/game_card.dart b/lib/engine/game_card.dart
+new file mode 100644
+index 0000000..4cd85ce
+--- /dev/null
++++ b/lib/engine/game_card.dart
+@@ -0,0 +1,29 @@
++import 'ability.dart';
++import 'element.dart';
++
++class GameCard {
++  final String id;
++  final String name;
++  final Element element;
++  final int power;
++  final Rarity rarity;
++  final Ability? ability;
++
++  const GameCard({
++    required this.id,
++    required this.name,
++    required this.element,
++    required this.power,
++    required this.rarity,
++    this.ability,
++  });
++
++  @override
++  bool operator ==(Object other) => other is GameCard && other.id == id;
++
++  @override
++  int get hashCode => id.hashCode;
++
++  @override
++  String toString() => 'GameCard($id, $name, $element, p$power)';
++}
+diff --git a/test/engine/game_card_test.dart b/test/engine/game_card_test.dart
+new file mode 100644
+index 0000000..2bbd746
+--- /dev/null
++++ b/test/engine/game_card_test.dart
+@@ -0,0 +1,38 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ability.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++
++void main() {
++  test('constructs a common card with no ability', () {
++    const card = GameCard(
++      id: 'fire_deer',
++      name: 'Горячий Олень',
++      element: Element.fire,
++      power: 5,
++      rarity: Rarity.common,
++    );
++    expect(card.ability, isNull);
++    expect(card.rarity, Rarity.common);
++    expect(card.power, 5);
++  });
++
++  test('constructs a trump card with an ability', () {
++    const trump = GameCard(
++      id: 'pumpkin_king',
++      name: 'Король-Тыква',
++      element: Element.nature,
++      power: 9,
++      rarity: Rarity.trump,
++      ability: Ability.doubleStrike,
++    );
++    expect(trump.ability, Ability.doubleStrike);
++  });
++
++  test('cards are equal by id', () {
++    const a = GameCard(id: 'x', name: 'A', element: Element.fire, power: 1, rarity: Rarity.common);
++    const b = GameCard(id: 'x', name: 'A clone', element: Element.water, power: 9, rarity: Rarity.rare);
++    expect(a, equals(b));
++    expect(a.hashCode, b.hashCode);
++  });
++}

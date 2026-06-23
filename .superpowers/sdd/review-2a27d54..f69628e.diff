@@ -1,0 +1,96 @@
+# Review package: 2a27d54..f69628e2d226287bed72f5d425c767d0717620da
+
+## Commits
+f69628e feat: add player controller interface and heuristic AI
+
+## Files changed
+ lib/engine/ai_controller.dart       | 19 +++++++++++++++++++
+ lib/engine/player_controller.dart   | 24 ++++++++++++++++++++++++
+ test/engine/ai_controller_test.dart | 23 +++++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
+
+## Diff
+diff --git a/lib/engine/ai_controller.dart b/lib/engine/ai_controller.dart
+new file mode 100644
+index 0000000..b0fb1ba
+--- /dev/null
++++ b/lib/engine/ai_controller.dart
+@@ -0,0 +1,19 @@
++import 'duel_engine.dart';
++import 'game_card.dart';
++import 'player_controller.dart';
++
++class AiController extends PlayerController {
++  @override
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  }) {
++    final sorted = List<GameCard>.of(hand)
++      ..sort((a, b) {
++        final byPower = b.power.compareTo(a.power);
++        return byPower != 0 ? byPower : a.id.compareTo(b.id);
++      });
++    return sorted.first;
++  }
++}
+diff --git a/lib/engine/player_controller.dart b/lib/engine/player_controller.dart
+new file mode 100644
+index 0000000..47be978
+--- /dev/null
++++ b/lib/engine/player_controller.dart
+@@ -0,0 +1,24 @@
++import 'duel_engine.dart';
++import 'game_card.dart';
++
++abstract class PlayerController {
++  /// Choose a card to play this round from [hand].
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  });
++}
++
++/// Human moves arrive from the UI, not from this method. The class exists so
++/// the duel flow is symmetric and a RemoteController can slot in later.
++class HumanController extends PlayerController {
++  @override
++  GameCard chooseCard({
++    required List<GameCard> hand,
++    required DuelConfig config,
++    GameCard? opponentLastCard,
++  }) {
++    throw UnimplementedError('Human moves are supplied by the UI layer.');
++  }
++}
+diff --git a/test/engine/ai_controller_test.dart b/test/engine/ai_controller_test.dart
+new file mode 100644
+index 0000000..fcb6e26
+--- /dev/null
++++ b/test/engine/ai_controller_test.dart
+@@ -0,0 +1,23 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/ai_controller.dart';
++import 'package:card_game/engine/duel_engine.dart';
++import 'package:card_game/engine/element.dart';
++import 'package:card_game/engine/game_card.dart';
++import 'package:card_game/engine/ability.dart';
++
++GameCard c(String id, int p) =>
++    GameCard(id: id, name: id, element: Element.fire, power: p, rarity: Rarity.common);
++
++void main() {
++  test('AI picks the highest-power card', () {
++    final ai = AiController();
++    final pick = ai.chooseCard(hand: [c('a', 3), c('b', 7), c('d', 5)], config: const DuelConfig());
++    expect(pick.id, 'b');
++  });
++
++  test('AI tie-breaks deterministically by id', () {
++    final ai = AiController();
++    final pick = ai.chooseCard(hand: [c('z', 5), c('a', 5)], config: const DuelConfig());
++    expect(pick.id, 'a');
++  });
++}

@@ -1,0 +1,72 @@
+# Review package: 558ba59..49c6ac58bb4ed6a2938212699d6da0ce102a4bdf
+
+## Commits
+49c6ac5 feat: add element model and advantage rules
+
+## Files changed
+ lib/engine/element.dart       | 21 +++++++++++++++++++++
+ test/engine/element_test.dart | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
+
+## Diff
+diff --git a/lib/engine/element.dart b/lib/engine/element.dart
+new file mode 100644
+index 0000000..9de9867
+--- /dev/null
++++ b/lib/engine/element.dart
+@@ -0,0 +1,21 @@
++/// The three fantasy elements. Cycle: fire -> nature -> water -> fire.
++enum Element { fire, nature, water }
++
++/// Bonus added to effective power when a card has elemental advantage.
++const int kElementBonus = 3;
++
++class ElementRules {
++  const ElementRules._();
++
++  /// Returns true if [a] has elemental advantage over [b].
++  static bool beats(Element a, Element b) {
++    switch (a) {
++      case Element.fire:
++        return b == Element.nature;
++      case Element.nature:
++        return b == Element.water;
++      case Element.water:
++        return b == Element.fire;
++    }
++  }
++}
+diff --git a/test/engine/element_test.dart b/test/engine/element_test.dart
+new file mode 100644
+index 0000000..cb11495
+--- /dev/null
++++ b/test/engine/element_test.dart
+@@ -0,0 +1,28 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:card_game/engine/element.dart';
++
++void main() {
++  group('ElementRules.beats', () {
++    test('fire beats nature', () {
++      expect(ElementRules.beats(Element.fire, Element.nature), isTrue);
++    });
++    test('nature beats water', () {
++      expect(ElementRules.beats(Element.nature, Element.water), isTrue);
++    });
++    test('water beats fire', () {
++      expect(ElementRules.beats(Element.water, Element.fire), isTrue);
++    });
++    test('relationship is not symmetric', () {
++      expect(ElementRules.beats(Element.nature, Element.fire), isFalse);
++      expect(ElementRules.beats(Element.water, Element.nature), isFalse);
++      expect(ElementRules.beats(Element.fire, Element.water), isFalse);
++    });
++    test('same element has no advantage', () {
++      expect(ElementRules.beats(Element.fire, Element.fire), isFalse);
++    });
++  });
++
++  test('element bonus is 3', () {
++    expect(kElementBonus, 3);
++  });
++}

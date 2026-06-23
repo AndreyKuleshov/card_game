@@ -1,1 +1,18 @@
-[]
+[
+  {"id":"fire_deer","name":"Горячий Олень","element":"fire","power":4,"rarity":"common","ability":null},
+  {"id":"fire_rooster","name":"Желанный Петушок","element":"fire","power":6,"rarity":"common","ability":null},
+  {"id":"fire_pie","name":"Горелый Пирожок","element":"fire","power":3,"rarity":"common","ability":null},
+  {"id":"fire_phoenix_pearl","name":"Перл Феникса","element":"fire","power":7,"rarity":"common","ability":null},
+  {"id":"nature_zucchini","name":"Боевой Кабачок","element":"nature","power":5,"rarity":"common","ability":null},
+  {"id":"nature_forester","name":"Пьяный Лесник","element":"nature","power":4,"rarity":"common","ability":null},
+  {"id":"nature_mushroom","name":"Гриб-Качок","element":"nature","power":6,"rarity":"common","ability":null},
+  {"id":"nature_hedgehog","name":"Боевой Ёж","element":"nature","power":3,"rarity":"common","ability":null},
+  {"id":"water_jellyfish","name":"Сердитая Медуза","element":"water","power":5,"rarity":"common","ability":null},
+  {"id":"water_puddle","name":"Капитан Лужа","element":"water","power":4,"rarity":"common","ability":null},
+  {"id":"water_beaver","name":"Бобёр-Сантехник","element":"water","power":6,"rarity":"common","ability":null},
+  {"id":"water_dumpling","name":"Ледяной Пельмень","element":"water","power":7,"rarity":"common","ability":null},
+  {"id":"trump_pumpkin_king","name":"Король-Тыква","element":"nature","power":9,"rarity":"trump","ability":"doubleStrike"},
+  {"id":"trump_lava_cat","name":"Лавовый Котик","element":"fire","power":8,"rarity":"trump","ability":"elementalShift"},
+  {"id":"trump_frost_granny","name":"Морозная Бабуля","element":"water","power":9,"rarity":"trump","ability":"shield"},
+  {"id":"trump_starter_drake","name":"Дракоша-Стартер","element":"fire","power":8,"rarity":"trump","ability":"doubleStrike"}
+]

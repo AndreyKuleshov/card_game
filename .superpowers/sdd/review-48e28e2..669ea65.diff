@@ -1,0 +1,799 @@
+# Review package: 48e28e2..669ea658c7fc2de1b25bc5d9ae2fe22e3a30bbf7
+
+## Commits
+669ea65 feat: add duel screen and post-duel reward flow (Task 14)
+3da946b feat: add kingdom screen with building upgrades and trump crafting (Tasks 13+13b)
+24ba2ec feat: add world map screen and duel setup (Task 12)
+fa0a147 feat: add riverpod providers and app shell (Task 11)
+
+## Files changed
+ lib/main.dart                    | 129 +++----------------------------------
+ lib/state/providers.dart         |  56 ++++++++++++++++
+ lib/ui/app.dart                  |  15 +++++
+ lib/ui/duel_screen.dart          | 136 +++++++++++++++++++++++++++++++++++++++
+ lib/ui/duel_setup.dart           |  89 +++++++++++++++++++++++++
+ lib/ui/kingdom_screen.dart       |  94 +++++++++++++++++++++++++++
+ lib/ui/reward_screen.dart        |  43 +++++++++++++
+ lib/ui/world_map_screen.dart     |  54 ++++++++++++++++
+ test/ui/app_smoke_test.dart      |  13 ++++
+ test/ui/duel_screen_test.dart    |  19 ++++++
+ test/ui/kingdom_screen_test.dart |  36 +++++++++++
+ test/ui/world_map_test.dart      |  18 ++++++
+ 12 files changed, 582 insertions(+), 120 deletions(-)
+
+## Diff
+diff --git a/lib/main.dart b/lib/main.dart
+index 244a702..18fedbf 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,122 +1,11 @@
+ import 'package:flutter/material.dart';
+-
+-void main() {
+-  runApp(const MyApp());
+-}
+-
+-class MyApp extends StatelessWidget {
+-  const MyApp({super.key});
+-
+-  // This widget is the root of your application.
+-  @override
+-  Widget build(BuildContext context) {
+-    return MaterialApp(
+-      title: 'Flutter Demo',
+-      theme: ThemeData(
+-        // This is the theme of your application.
+-        //
+-        // TRY THIS: Try running your application with "flutter run". You'll see
+-        // the application has a purple toolbar. Then, without quitting the app,
+-        // try changing the seedColor in the colorScheme below to Colors.green
+-        // and then invoke "hot reload" (save your changes or press the "hot
+-        // reload" button in a Flutter-supported IDE, or press "r" if you used
+-        // the command line to start the app).
+-        //
+-        // Notice that the counter didn't reset back to zero; the application
+-        // state is not lost during the reload. To reset the state, use hot
+-        // restart instead.
+-        //
+-        // This works for code too, not just values: Most code changes can be
+-        // tested with just a hot reload.
+-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+-      ),
+-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+-    );
+-  }
+-}
+-
+-class MyHomePage extends StatefulWidget {
+-  const MyHomePage({super.key, required this.title});
+-
+-  // This widget is the home page of your application. It is stateful, meaning
+-  // that it has a State object (defined below) that contains fields that affect
+-  // how it looks.
+-
+-  // This class is the configuration for the state. It holds the values (in this
+-  // case the title) provided by the parent (in this case the App widget) and
+-  // used by the build method of the State. Fields in a Widget subclass are
+-  // always marked "final".
+-
+-  final String title;
+-
+-  @override
+-  State<MyHomePage> createState() => _MyHomePageState();
+-}
+-
+-class _MyHomePageState extends State<MyHomePage> {
+-  int _counter = 0;
+-
+-  void _incrementCounter() {
+-    setState(() {
+-      // This call to setState tells the Flutter framework that something has
+-      // changed in this State, which causes it to rerun the build method below
+-      // so that the display can reflect the updated values. If we changed
+-      // _counter without calling setState(), then the build method would not be
+-      // called again, and so nothing would appear to happen.
+-      _counter++;
+-    });
+-  }
+-
+-  @override
+-  Widget build(BuildContext context) {
+-    // This method is rerun every time setState is called, for instance as done
+-    // by the _incrementCounter method above.
+-    //
+-    // The Flutter framework has been optimized to make rerunning build methods
+-    // fast, so that you can just rebuild anything that needs updating rather
+-    // than having to individually change instances of widgets.
+-    return Scaffold(
+-      appBar: AppBar(
+-        // TRY THIS: Try changing the color here to a specific color (to
+-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
+-        // change color while the other colors stay the same.
+-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+-        // Here we take the value from the MyHomePage object that was created by
+-        // the App.build method, and use it to set our appbar title.
+-        title: Text(widget.title),
+-      ),
+-      body: Center(
+-        // Center is a layout widget. It takes a single child and positions it
+-        // in the middle of the parent.
+-        child: Column(
+-          // Column is also a layout widget. It takes a list of children and
+-          // arranges them vertically. By default, it sizes itself to fit its
+-          // children horizontally, and tries to be as tall as its parent.
+-          //
+-          // Column has various properties to control how it sizes itself and
+-          // how it positions its children. Here we use mainAxisAlignment to
+-          // center the children vertically; the main axis here is the vertical
+-          // axis because Columns are vertical (the cross axis would be
+-          // horizontal).
+-          //
+-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+-          // action in the IDE, or press "p" in the console), to see the
+-          // wireframe for each widget.
+-          mainAxisAlignment: .center,
+-          children: [
+-            const Text('You have pushed the button this many times:'),
+-            Text(
+-              '$_counter',
+-              style: Theme.of(context).textTheme.headlineMedium,
+-            ),
+-          ],
+-        ),
+-      ),
+-      floatingActionButton: FloatingActionButton(
+-        onPressed: _incrementCounter,
+-        tooltip: 'Increment',
+-        child: const Icon(Icons.add),
+-      ),
+-    );
+-  }
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'state/providers.dart';
++import 'ui/app.dart';
++
++Future<void> main() async {
++  WidgetsFlutterBinding.ensureInitialized();
++  final container = ProviderContainer();
++  await container.read(saveStateProvider.notifier).hydrate();
++  runApp(UncontrolledProviderScope(container: container, child: const CardGameApp()));
+ }
+diff --git a/lib/state/providers.dart b/lib/state/providers.dart
+new file mode 100644
+index 0000000..779d400
+--- /dev/null
++++ b/lib/state/providers.dart
+@@ -0,0 +1,56 @@
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../data/card_repository.dart';
++import '../engine/game_card.dart';
++import '../engine/kingdom.dart';
++import '../models/save_state.dart';
++import '../models/save_store.dart';
++
++final saveStoreProvider = Provider<SaveStore>((ref) => SaveStore());
++
++final cardsProvider = FutureProvider<List<GameCard>>((ref) async {
++  return CardRepository.loadFromAsset();
++});
++
++final saveStateProvider =
++    NotifierProvider<SaveController, SaveState>(SaveController.new);
++
++class SaveController extends Notifier<SaveState> {
++  late final SaveStore _store;
++
++  @override
++  SaveState build() {
++    _store = ref.read(saveStoreProvider);
++    return SaveState.initial();
++  }
++
++  Future<void> hydrate() async {
++    state = await _store.load();
++  }
++
++  void _commit(SaveState next) {
++    state = next;
++    _store.save(next);
++  }
++
++  void addCrystals(int n) => _commit(state.copyWith(crystals: state.crystals + n));
++
++  bool tryUpgrade(BuildingType type) {
++    final level = state.kingdom.levelOf(type);
++    if (level >= 3) return false;
++    final cost = KingdomEconomy.upgradeCost(type, level);
++    if (state.crystals < cost) return false;
++    _commit(state.copyWith(
++      crystals: state.crystals - cost,
++      kingdom: state.kingdom.upgraded(type),
++    ));
++    return true;
++  }
++
++  void grantCard(String id) {
++    if (state.ownedCardIds.contains(id)) return;
++    _commit(state.copyWith(ownedCardIds: {...state.ownedCardIds, id}));
++  }
++
++  void unlockNextNode() =>
++      _commit(state.copyWith(unlockedNodeIndex: state.unlockedNodeIndex + 1));
++}
+diff --git a/lib/ui/app.dart b/lib/ui/app.dart
+new file mode 100644
+index 0000000..34fb628
+--- /dev/null
++++ b/lib/ui/app.dart
+@@ -0,0 +1,15 @@
++import 'package:flutter/material.dart';
++import 'world_map_screen.dart';
++
++class CardGameApp extends StatelessWidget {
++  const CardGameApp({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return MaterialApp(
++      title: 'Карточное Королевство',
++      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
++      home: const WorldMapScreen(),
++    );
++  }
++}
+diff --git a/lib/ui/duel_screen.dart b/lib/ui/duel_screen.dart
+new file mode 100644
+index 0000000..7312161
+--- /dev/null
++++ b/lib/ui/duel_screen.dart
+@@ -0,0 +1,136 @@
++import 'dart:math';
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../engine/duel_session.dart';
++import '../engine/game_card.dart';
++import '../state/providers.dart';
++import 'duel_setup.dart';
++import 'reward_screen.dart';
++
++class DuelScreen extends ConsumerStatefulWidget {
++  final MapNode node;
++  const DuelScreen({super.key, required this.node});
++
++  @override
++  ConsumerState<DuelScreen> createState() => _DuelScreenState();
++}
++
++class _DuelScreenState extends ConsumerState<DuelScreen> {
++  DuelSession? _session;
++  String _log = 'Выбери карту';
++  bool _resolved = false;
++
++  @override
++  Widget build(BuildContext context) {
++    final cardsAsync = ref.watch(cardsProvider);
++    final save = ref.watch(saveStateProvider);
++
++    return cardsAsync.when(
++      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
++      error: (e, _) => Scaffold(body: Center(child: Text('Ошибка: $e'))),
++      data: (allCards) {
++        final session = _session ??= buildSession(
++          save: save,
++          allCards: allCards,
++          node: widget.node,
++          random: Random(widget.node.index + 1),
++        );
++        return Scaffold(
++          appBar: AppBar(title: Text(widget.node.title)),
++          body: Padding(
++            padding: const EdgeInsets.all(16),
++            child: Column(
++              children: [
++                Text('Замок врага: ${session.opponentCastleHp}'),
++                Text('Твой Замок: ${session.playerCastleHp}'),
++                const SizedBox(height: 12),
++                Text(_log),
++                const Spacer(),
++                Wrap(
++                  spacing: 8,
++                  runSpacing: 8,
++                  children: [
++                    for (final card in session.playerHand)
++                      Card(
++                        child: InkWell(
++                          onTap: _resolved ? null : () => _play(card, session),
++                          child: SizedBox(
++                            width: 80,
++                            height: 110,
++                            child: Padding(
++                              padding: const EdgeInsets.all(6),
++                              child: Column(
++                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                                children: [
++                                  Text(_elementEmoji(card),
++                                      style: const TextStyle(fontSize: 22)),
++                                  Flexible(
++                                    child: Text(card.name,
++                                        textAlign: TextAlign.center,
++                                        overflow: TextOverflow.ellipsis,
++                                        maxLines: 2,
++                                        style: const TextStyle(fontSize: 10)),
++                                  ),
++                                  Text('${card.power}',
++                                      style: const TextStyle(
++                                          fontSize: 18, fontWeight: FontWeight.bold)),
++                                ],
++                              ),
++                            ),
++                          ),
++                        ),
++                      ),
++                  ],
++                ),
++              ],
++            ),
++          ),
++        );
++      },
++    );
++  }
++
++  String _elementEmoji(GameCard c) =>
++      {'fire': '🔥', 'nature': '🌿', 'water': '💧'}[c.element.name]!;
++
++  void _play(GameCard card, DuelSession session) {
++    final result = session.playPlayerCard(card);
++    setState(() {
++      _log = 'Раунд: ${result.playerEffectivePower} против '
++          '${result.opponentEffectivePower}, урон ${result.damage}';
++    });
++    final outcome = session.outcome;
++    if (outcome != DuelOutcome.ongoing && !_resolved) {
++      _resolved = true;
++      _finish(outcome == DuelOutcome.playerWon);
++    } else {
++      setState(() {}); // refresh hand
++    }
++  }
++
++  void _finish(bool won) {
++    final controller = ref.read(saveStateProvider.notifier);
++    final save = ref.read(saveStateProvider);
++    int earned = 0;
++    String? trump;
++    if (won) {
++      earned = 5 + save.kingdom.mineCrystalsPerWin;
++      controller.addCrystals(earned);
++      if (widget.node.index >= save.unlockedNodeIndex &&
++          widget.node.index < kSliceNodes.length - 1) {
++        controller.unlockNextNode();
++      }
++      if (widget.node.rewardTrumpId != null) {
++        trump = widget.node.rewardTrumpId;
++        controller.grantCard(trump!);
++      } else if (Random(widget.node.index + 7).nextDouble() < 0.30) {
++        trump = 'trump_frost_granny';
++        controller.grantCard(trump);
++      }
++    }
++    Navigator.of(context).pushReplacement(MaterialPageRoute(
++      builder: (_) =>
++          RewardScreen(won: won, crystalsEarned: earned, trumpGranted: trump),
++    ));
++  }
++}
+diff --git a/lib/ui/duel_setup.dart b/lib/ui/duel_setup.dart
+new file mode 100644
+index 0000000..3d2459f
+--- /dev/null
++++ b/lib/ui/duel_setup.dart
+@@ -0,0 +1,89 @@
++import 'dart:math';
++import '../engine/ai_controller.dart';
++import '../engine/deck.dart';
++import '../engine/duel_engine.dart';
++import '../engine/duel_session.dart';
++import '../engine/game_card.dart';
++import '../engine/kingdom.dart';
++import '../models/save_state.dart';
++
++const int kDeckSize = 12;
++
++class MapNode {
++  final int index;
++  final String title;
++  final List<String> opponentCardIds;
++  final DuelConfig opponentConfig;
++  final bool isBoss;
++  final String? rewardTrumpId;
++
++  const MapNode({
++    required this.index,
++    required this.title,
++    required this.opponentCardIds,
++    required this.opponentConfig,
++    this.isBoss = false,
++    this.rewardTrumpId,
++  });
++}
++
++const kSliceNodes = <MapNode>[
++  MapNode(
++    index: 0,
++    title: 'Тренировка',
++    opponentCardIds: ['fire_pie', 'nature_hedgehog', 'water_puddle', 'fire_deer'],
++    opponentConfig: DuelConfig(startingCastleHp: 20),
++  ),
++  MapNode(
++    index: 1,
++    title: 'Противник 1',
++    opponentCardIds: ['fire_rooster', 'nature_zucchini', 'water_jellyfish', 'nature_mushroom'],
++    opponentConfig: DuelConfig(startingCastleHp: 28),
++  ),
++  MapNode(
++    index: 2,
++    title: 'Противник 2',
++    opponentCardIds: ['water_beaver', 'fire_phoenix_pearl', 'nature_mushroom', 'water_dumpling'],
++    opponentConfig: DuelConfig(startingCastleHp: 34),
++  ),
++  MapNode(
++    index: 3,
++    title: 'БОСС: Тыквенный Лорд',
++    opponentCardIds: ['water_dumpling', 'fire_phoenix_pearl', 'water_beaver', 'trump_lava_cat'],
++    opponentConfig: DuelConfig(startingCastleHp: 40),
++    isBoss: true,
++    rewardTrumpId: 'trump_pumpkin_king',
++  ),
++];
++
++/// Builds a 12-card deck from owned cards, padding by repeating owned ids so a
++/// thin starter collection still fills a deck.
++List<GameCard> buildPlayerDeck(SaveState save, List<GameCard> allCards) {
++  final owned = allCards.where((c) => save.ownedCardIds.contains(c.id)).toList();
++  final deck = <GameCard>[];
++  var i = 0;
++  while (deck.length < kDeckSize && owned.isNotEmpty) {
++    deck.add(owned[i % owned.length]);
++    i++;
++  }
++  return deck;
++}
++
++DuelSession buildSession({
++  required SaveState save,
++  required List<GameCard> allCards,
++  required MapNode node,
++  required Random random,
++}) {
++  final byId = {for (final c in allCards) c.id: c};
++  final playerCards = buildPlayerDeck(save, allCards);
++  final oppCards = node.opponentCardIds.map((id) => byId[id]!).toList();
++  return DuelSession(
++    playerDeck: Deck(playerCards),
++    opponentDeck: Deck(oppCards),
++    playerConfig: KingdomEconomy.toDuelConfig(save.kingdom),
++    opponentConfig: node.opponentConfig,
++    ai: AiController(),
++    random: random,
++  )..start();
++}
+diff --git a/lib/ui/kingdom_screen.dart b/lib/ui/kingdom_screen.dart
+new file mode 100644
+index 0000000..3db7407
+--- /dev/null
++++ b/lib/ui/kingdom_screen.dart
+@@ -0,0 +1,94 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../engine/kingdom.dart';
++import '../state/providers.dart';
++
++class KingdomScreen extends ConsumerWidget {
++  const KingdomScreen({super.key});
++
++  static const _titles = {
++    BuildingType.barracks: 'Казарма',
++    BuildingType.wall: 'Стена',
++    BuildingType.mine: 'Шахта',
++  };
++
++  String _effect(BuildingType type, Kingdom k) {
++    switch (type) {
++      case BuildingType.barracks:
++        return '+${k.barracksBonus} к силе карт стихии';
++      case BuildingType.wall:
++        return '+${k.wallHpBonus} ХП замка';
++      case BuildingType.mine:
++        return '+${k.mineCrystalsPerWin} 💎 за победу';
++    }
++  }
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final save = ref.watch(saveStateProvider);
++    final controller = ref.read(saveStateProvider.notifier);
++    final k = save.kingdom;
++
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Королевство'),
++        actions: [
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('💎 ${save.crystals}')),
++          ),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          for (final type in BuildingType.values)
++            Card(
++              child: Column(
++                children: [
++                  ListTile(
++                    title: Text(_titles[type]!),
++                    subtitle: Text('Ур. ${k.levelOf(type)} — ${_effect(type, k)}'),
++                    trailing: k.levelOf(type) >= 3
++                        ? const Text('МАКС')
++                        : FilledButton(
++                            onPressed: save.crystals >=
++                                    KingdomEconomy.upgradeCost(type, k.levelOf(type))
++                                ? () => controller.tryUpgrade(type)
++                                : null,
++                            child: Text(
++                                'Улучшить (${KingdomEconomy.upgradeCost(type, k.levelOf(type))}💎)'),
++                          ),
++                  ),
++                  if (type == BuildingType.barracks && k.barracksLevel >= 3)
++                    Builder(builder: (context) {
++                      const craftId = 'trump_pumpkin_king';
++                      const altId = 'trump_frost_granny';
++                      final target = save.ownedCardIds.contains(craftId) ? altId : craftId;
++                      if (save.ownedCardIds.contains(target)) {
++                        return const Padding(
++                          padding: EdgeInsets.all(8),
++                          child: Text('Все козыри кузницы созданы'),
++                        );
++                      }
++                      return Padding(
++                        padding: const EdgeInsets.all(8),
++                        child: FilledButton.tonal(
++                          onPressed: save.crystals >= 40
++                              ? () {
++                                  controller.addCrystals(-40);
++                                  controller.grantCard(target);
++                                }
++                              : null,
++                          child: const Text('Создать козырь (40💎)'),
++                        ),
++                      );
++                    }),
++                ],
++              ),
++            ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/ui/reward_screen.dart b/lib/ui/reward_screen.dart
+new file mode 100644
+index 0000000..105ddc7
+--- /dev/null
++++ b/lib/ui/reward_screen.dart
+@@ -0,0 +1,43 @@
++import 'package:flutter/material.dart';
++
++class RewardScreen extends StatelessWidget {
++  final bool won;
++  final int crystalsEarned;
++  final String? trumpGranted;
++
++  const RewardScreen({
++    super.key,
++    required this.won,
++    required this.crystalsEarned,
++    this.trumpGranted,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: Text(won ? 'Победа!' : 'Поражение')),
++      body: Center(
++        child: Column(
++          mainAxisAlignment: MainAxisAlignment.center,
++          children: [
++            Text(won ? '🎉 Замок врага пал!' : '💥 Твой замок разрушен',
++                style: Theme.of(context).textTheme.headlineSmall),
++            const SizedBox(height: 16),
++            if (won) Text('Получено: 💎 $crystalsEarned'),
++            if (trumpGranted != null)
++              Padding(
++                padding: const EdgeInsets.only(top: 8),
++                child: Text('🏆 Новый козырь: $trumpGranted'),
++              ),
++            const SizedBox(height: 24),
++            FilledButton(
++              onPressed: () => Navigator.of(context)
++                  .popUntil((route) => route.isFirst),
++              child: const Text('В королевство'),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/ui/world_map_screen.dart b/lib/ui/world_map_screen.dart
+new file mode 100644
+index 0000000..b4b4743
+--- /dev/null
++++ b/lib/ui/world_map_screen.dart
+@@ -0,0 +1,54 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../state/providers.dart';
++import 'duel_setup.dart';
++import 'duel_screen.dart';
++import 'kingdom_screen.dart';
++
++class WorldMapScreen extends ConsumerWidget {
++  const WorldMapScreen({super.key});
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final save = ref.watch(saveStateProvider);
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Карта мира'),
++        actions: [
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12),
++            child: Center(child: Text('💎 ${save.crystals}')),
++          ),
++          IconButton(
++            icon: const Icon(Icons.castle),
++            tooltip: 'Королевство',
++            onPressed: () => Navigator.of(context).push(
++              MaterialPageRoute(builder: (_) => const KingdomScreen()),
++            ),
++          ),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          for (final node in kSliceNodes)
++            Card(
++              child: ListTile(
++                leading: Icon(node.isBoss ? Icons.whatshot : Icons.flag),
++                title: Text(node.title),
++                trailing: node.index <= save.unlockedNodeIndex
++                    ? const Icon(Icons.play_arrow)
++                    : const Icon(Icons.lock),
++                enabled: node.index <= save.unlockedNodeIndex,
++                onTap: node.index <= save.unlockedNodeIndex
++                    ? () => Navigator.of(context).push(
++                          MaterialPageRoute(builder: (_) => DuelScreen(node: node)),
++                        )
++                    : null,
++              ),
++            ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/test/ui/app_smoke_test.dart b/test/ui/app_smoke_test.dart
+new file mode 100644
+index 0000000..4808e13
+--- /dev/null
++++ b/test/ui/app_smoke_test.dart
+@@ -0,0 +1,13 @@
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/app.dart';
++
++void main() {
++  testWidgets('app boots to the world map', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(child: CardGameApp()));
++    await tester.pumpAndSettle();
++    expect(find.text('Карта мира'), findsOneWidget);
++  });
++}
+diff --git a/test/ui/duel_screen_test.dart b/test/ui/duel_screen_test.dart
+new file mode 100644
+index 0000000..08de07f
+--- /dev/null
++++ b/test/ui/duel_screen_test.dart
+@@ -0,0 +1,19 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/duel_screen.dart';
++import 'package:card_game/ui/duel_setup.dart';
++
++void main() {
++  testWidgets('duel screen renders castle hp and a playable hand', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(ProviderScope(
++      child: MaterialApp(home: DuelScreen(node: kSliceNodes.first)),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.textContaining('Замок'), findsWidgets);
++    // Hand cards are rendered as InkWell-wrapped tiles; at least one exists.
++    expect(find.byType(Card), findsWidgets);
++  });
++}
+diff --git a/test/ui/kingdom_screen_test.dart b/test/ui/kingdom_screen_test.dart
+new file mode 100644
+index 0000000..95d2c2e
+--- /dev/null
++++ b/test/ui/kingdom_screen_test.dart
+@@ -0,0 +1,36 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/kingdom_screen.dart';
++import 'package:card_game/state/providers.dart';
++import 'package:card_game/engine/kingdom.dart';
++
++void main() {
++  testWidgets('kingdom screen lists three buildings', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(
++      child: MaterialApp(home: KingdomScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.text('Казарма'), findsOneWidget);
++    expect(find.text('Стена'), findsOneWidget);
++    expect(find.text('Шахта'), findsOneWidget);
++  });
++
++  testWidgets('craft button appears only at barracks level 3', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    final container = ProviderContainer();
++    // Force barracks to level 3 with plenty of crystals.
++    final ctrl = container.read(saveStateProvider.notifier);
++    ctrl.addCrystals(100);
++    ctrl.tryUpgrade(BuildingType.barracks); // 1->2
++    ctrl.tryUpgrade(BuildingType.barracks); // 2->3
++    await tester.pumpWidget(UncontrolledProviderScope(
++      container: container,
++      child: const MaterialApp(home: KingdomScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.textContaining('Создать козырь'), findsOneWidget);
++  });
++}
+diff --git a/test/ui/world_map_test.dart b/test/ui/world_map_test.dart
+new file mode 100644
+index 0000000..f1dd21e
+--- /dev/null
++++ b/test/ui/world_map_test.dart
+@@ -0,0 +1,18 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:card_game/ui/world_map_screen.dart';
++
++void main() {
++  testWidgets('world map shows nodes and locks future ones', (tester) async {
++    SharedPreferences.setMockInitialValues({});
++    await tester.pumpWidget(const ProviderScope(
++      child: MaterialApp(home: WorldMapScreen()),
++    ));
++    await tester.pumpAndSettle();
++    expect(find.text('Карта мира'), findsOneWidget);
++    expect(find.text('Тренировка'), findsOneWidget);
++    expect(find.textContaining('БОСС'), findsOneWidget);
++  });
++}
