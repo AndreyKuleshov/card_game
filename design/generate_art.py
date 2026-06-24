@@ -169,6 +169,10 @@ ENTITIES = [
     ("enemy_1",            "map", "node", "a small green goblin grunt head with a tiny dagger, weak low-tier enemy, slightly comedic, round badge"),
     ("enemy_2",            "map", "node", "a tough brown orc brute head with tusks and war-paint and a spiked helmet, stronger mid-tier enemy, menacing, round badge"),
 
+    # --- Сундук награды ---
+    ("chest_closed",       "icons", "icon", "a closed wooden treasure chest with golden iron bands and a lock, plump and inviting, slight glow"),
+    ("chest_open",         "icons", "icon", "an open wooden treasure chest overflowing with glowing golden light, golden iron bands, radiant burst from inside, treasure glow"),
+
     # --- Иконки UI / валюта ---
     ("icon_crystal",       "icons", "icon", "a single glowing blue crystal gem, faceted, sparkle"),
     ("icon_castle",        "icons", "icon", "a small castle icon, clean silhouette"),

@@ -37,6 +37,10 @@ class GameAssets {
   static const String iconCrystal = 'assets/icons/icon_crystal.png';
   static const String iconCastle = 'assets/icons/icon_castle.png';
 
+  // ── Reward chest (end-of-battle overlay) ─────────────────────────────────
+  static const String chestClosed = 'assets/icons/chest_closed.png';
+  static const String chestOpen = 'assets/icons/chest_open.png';
+
   // ── World-map markers ─────────────────────────────────────────────────────
   /// Distinct enemy marker per opponent tier (enemy_1, enemy_2, …); higher
   /// tiers fall back to the last available icon.
@@ -66,6 +70,8 @@ class GameAssets {
         duelLayout,
         iconCrystal,
         iconCastle,
+        chestClosed,
+        chestOpen,
         enemy(1),
         enemy(2),
         mapTraining,

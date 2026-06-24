@@ -9,7 +9,6 @@ import '../engine/game_card.dart';
 import '../state/providers.dart';
 import 'duel_setup.dart';
 import 'game_assets.dart';
-import 'reward_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -28,6 +27,12 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
   bool _resolved = false;
   bool _showReveal = false;
   bool _animating = false;
+
+  // End-of-battle overlay state.
+  bool _finished = false;
+  bool _won = false;
+  DuelReward? _reward;
+  bool _rewardApplied = false;
 
   // Animation controller for the card-play slide-in effect.
   late final AnimationController _cardAnimController;
@@ -88,12 +93,18 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
           node: widget.node,
           random: Random(), // fresh shuffle → a different deal every battle
         );
-        return _buildTable(session);
+        return _buildTable(session, allCards);
       },
     );
   }
 
-  Widget _buildTable(DuelSession session) {
+  Widget _buildTable(DuelSession session, List<GameCard> allCards) {
+    GameCard? trumpCard;
+    final trumpId = _reward?.trumpGranted;
+    if (trumpId != null) {
+      final m = allCards.where((c) => c.id == trumpId);
+      if (m.isNotEmpty) trumpCard = m.first;
+    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.node.title)),
       body: Container(
@@ -185,6 +196,15 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
                 ],
               ),
             ),
+            // End-of-battle overlay (no navigation — drawn on top of the duel).
+            if (_finished)
+              _EndOverlay(
+                won: _won,
+                crystals: _reward?.crystalsEarned ?? 0,
+                trumpCard: trumpCard,
+                onClaim: _claimRewards,
+                onExit: _exitToMap,
+              ),
           ],
         ),
       ),
@@ -234,8 +254,9 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
     });
   }
 
+  // Battle ended: compute the reward and show the end overlay (no navigation).
+  // Rewards are credited when the chest is opened (see [_claimRewards]).
   void _finish(bool won) {
-    final controller = ref.read(saveStateProvider.notifier);
     final save = ref.read(saveStateProvider);
     final reward = computeDuelReward(
       node: widget.node,
@@ -243,19 +264,26 @@ class _DuelScreenState extends ConsumerState<DuelScreen>
       won: won,
       random: Random(),
     );
-    if (won) {
-      if (reward.crystalsEarned > 0) controller.addCrystals(reward.crystalsEarned);
-      if (reward.unlockNext) controller.unlockNextNode();
-      if (reward.trumpGranted != null) controller.grantCard(reward.trumpGranted!);
-    }
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => RewardScreen(
-        won: won,
-        crystalsEarned: reward.crystalsEarned,
-        trumpGranted: reward.trumpGranted,
-      ),
-    ));
+    setState(() {
+      _finished = true;
+      _won = won;
+      _reward = reward;
+    });
   }
+
+  // Credit crystals / trump / unlock when the player opens the chest (win only).
+  void _claimRewards() {
+    if (_rewardApplied || !_won || _reward == null) return;
+    _rewardApplied = true;
+    final controller = ref.read(saveStateProvider.notifier);
+    final r = _reward!;
+    if (r.crystalsEarned > 0) controller.addCrystals(r.crystalsEarned);
+    if (r.unlockNext) controller.unlockNextNode();
+    if (r.trumpGranted != null) controller.grantCard(r.trumpGranted!);
+  }
+
+  void _exitToMap() =>
+      Navigator.of(context).popUntil((route) => route.isFirst);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -666,6 +694,157 @@ class _TrumpRow extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _EndOverlay — drawn on top of the duel when a battle ends (no navigation).
+// Win: a chest the player taps to open; crystals + trump spill out. Loss: a
+// defeat card. Both end with a "В королевство" button.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EndOverlay extends StatefulWidget {
+  final bool won;
+  final int crystals;
+  final GameCard? trumpCard;
+  final VoidCallback onClaim; // credit rewards (win, when the chest opens)
+  final VoidCallback onExit;
+
+  const _EndOverlay({
+    required this.won,
+    required this.crystals,
+    required this.trumpCard,
+    required this.onClaim,
+    required this.onExit,
+  });
+
+  @override
+  State<_EndOverlay> createState() => _EndOverlayState();
+}
+
+class _EndOverlayState extends State<_EndOverlay> {
+  bool _open = false;
+
+  void _openChest() {
+    setState(() => _open = true);
+    widget.onClaim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black.withAlpha(180),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: widget.won ? _win(context) : _loss(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _title(BuildContext context, String text, Color color) => Text(
+        text,
+        style: Theme.of(context)
+            .textTheme
+            .headlineMedium
+            ?.copyWith(color: color),
+      );
+
+  Widget _exitButton() => FilledButton(
+        onPressed: widget.onExit,
+        child: const Text('В королевство'),
+      );
+
+  Widget _loss(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('💥', style: TextStyle(fontSize: 64)),
+          const SizedBox(height: 8),
+          _title(context, 'Поражение', const Color(0xFFC62828)),
+          const SizedBox(height: 8),
+          const Text('💀 Твой замок разрушен',
+              style: TextStyle(color: Colors.white)),
+          const SizedBox(height: 28),
+          _exitButton(),
+        ],
+      );
+
+  Widget _win(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _title(context, 'Победа!', const Color(0xFF66BB6A)),
+        const SizedBox(height: 18),
+        if (!_open) ...[
+          GestureDetector(
+            onTap: _openChest,
+            child: Image.asset(
+              GameAssets.chestClosed,
+              width: 170,
+              errorBuilder: (_, _, _) =>
+                  const Text('🧰', style: TextStyle(fontSize: 110)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text('Нажми, чтобы открыть',
+              style: TextStyle(
+                  color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+        ] else ...[
+          Image.asset(
+            GameAssets.chestOpen,
+            width: 180,
+            errorBuilder: (_, _, _) =>
+                const Text('🧰', style: TextStyle(fontSize: 120)),
+          ),
+          const SizedBox(height: 14),
+          // Rewards spill out with a quick scale-in.
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.elasticOut,
+            builder: (context, t, child) =>
+                Transform.scale(scale: t.clamp(0.0, 1.0), child: child),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF90CAF9)),
+                  ),
+                  child: Text(
+                    '+${widget.crystals} 💎',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1565C0),
+                    ),
+                  ),
+                ),
+                if (widget.trumpCard != null) ...[
+                  const SizedBox(height: 14),
+                  const Text('🏆 Новый козырь!',
+                      style: TextStyle(
+                          color: Colors.amber,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  GameCardView(card: widget.trumpCard!, width: 96),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _exitButton(),
+        ],
+      ],
     );
   }
 }
